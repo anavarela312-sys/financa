@@ -350,6 +350,8 @@ export default function App(){
   const [orcs,setOrcs]=useLS("fin_orcs_v6",DEF_ORC);
   const [snaps,setSnaps]=useLS("fin_snaps_v6",DEF_SNAPS);
 
+  const [cats,setCats]=useLS("fin_cats_v6",DEFAULT_CATS);
+
   const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats}),[trans,pend,contas,orcs,snaps,cats]);
   const handleDriveLoad=useCallback(json=>{
     if(json.trans)setTrans(json.trans);if(json.pend)setPend(json.pend);
@@ -357,7 +359,6 @@ export default function App(){
     if(json.snaps)setSnaps(json.snaps);if(json.cats)setCats(json.cats);
   },[setTrans,setPend,setContas,setOrcs,setSnaps,setCats]);
   const {status:driveStatus,signIn,signOut,isConnected}=useDriveSync(allData,handleDriveLoad);
-  const [cats,setCats]=useLS("fin_cats_v6",DEFAULT_CATS);
 
   const [pEd,setPEd]=useState({});
   const [editId,setEditId]=useState(null);
