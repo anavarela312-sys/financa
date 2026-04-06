@@ -367,6 +367,7 @@ export default function App(){
   const [importMsg,setImportMsg]=useState("");
   const [simExtra,setSimExtra]=useState(0);
   const [newSnap,setNewSnap]=useState("");
+  const [dismissedAlerts,setDismissedAlerts]=useState(new Set());
   const [search,setSearch]=useState("");
   const [dateFrom,setDateFrom]=useState("");
   const [dateTo,setDateTo]=useState("");
@@ -504,7 +505,7 @@ export default function App(){
     {id:"dashboard",label:"Início",icon:"◈"},
     {id:"orcamento",label:"Orçamento",icon:"◉"},
     {id:"transacoes",label:"Movimentos",icon:"≡"},
-    {id:"categorizar",label:`Cat.${pend.length?` (${pend.length})`:""}`,icon:"◎"},
+    {id:"categorizar",label:`Categorizar${pend.length?` (${pend.length})`:""}`,icon:"◎"},
     {id:"importar",label:"Importar",icon:"↑"},
   ];
 
@@ -695,15 +696,20 @@ export default function App(){
           {tab==="dashboard"&&(
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Dashboard</p><p style={{fontSize:12,color:"#64748b",marginBottom:14}}>{MESES[fMes]} {fAno}</p></>}
-              {alerts.length>0&&(
+              {alerts.filter(a=>!dismissedAlerts.has(a.cat)).length>0&&(
                 <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:12,padding:"10px 14px",marginBottom:12}}>
-                  <p style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:4}}>⚠️ Alertas</p>
-                  {alerts.map(a=>(
-                    <div key={a.cat} style={{display:"flex",justifyContent:"space-between",padding:"2px 0",cursor:"pointer"}} onClick={()=>setCatModal(a.cat)}>
-                      <span style={{fontSize:12,color:"#94a3b8"}}>{cats[a.cat]?.icon} {a.cat}</span>
-                      <span style={{fontSize:12,color:a.pct>=100?"#ef4444":"#f59e0b",fontWeight:600}}>{a.pct.toFixed(0)}% · {fE0(a.net)}/{fE0(a.orc)}</span>
+                  <p style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:6}}>⚠️ Alertas de orçamento</p>
+                  {alerts.filter(a=>!dismissedAlerts.has(a.cat)).map(a=>(
+                    <div key={a.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                      <input type="checkbox" onChange={()=>setDismissedAlerts(prev=>{const n=new Set(prev);n.add(a.cat);return n;})}
+                        style={{width:14,height:14,cursor:"pointer",accentColor:"#3b82f6",flexShrink:0}}/>
+                      <div style={{flex:1,display:"flex",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setCatModal(a.cat)}>
+                        <span style={{fontSize:12,color:"#94a3b8"}}>{cats[a.cat]?.icon} {a.cat}</span>
+                        <span style={{fontSize:12,color:a.pct>=100?"#ef4444":"#f59e0b",fontWeight:600}}>{a.pct.toFixed(0)}% · {fE0(a.net)}/{fE0(a.orc)}</span>
+                      </div>
                     </div>
                   ))}
+                  <p style={{fontSize:10,color:"#64748b",marginTop:6}}>✓ marca para ignorar este mês</p>
                 </div>
               )}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
@@ -736,13 +742,18 @@ export default function App(){
                   <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:isMobile?"wrap":"nowrap"}}>
                     <div style={{display:"flex",justifyContent:"center",flexShrink:0}}><PieChart data={pieData} size={isMobile?140:160}/></div>
                     <div style={{flex:1,minWidth:0}}>
-                      {pieData.map(d=>(
-                        <div key={d.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer"}} onClick={()=>setCatModal(d.cat)}>
-                          <div style={{width:10,height:10,borderRadius:2,background:d.color,flexShrink:0}}/>
-                          <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cats[d.cat]?.icon} {d.cat}</span>
-                          <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0}}>{fE0(d.val)}</span>
-                        </div>
-                      ))}
+                      {pieData.map(d=>{
+                        const total=pieData.reduce((a,x)=>a+x.val,0);
+                        const pct=total>0?((d.val/total)*100).toFixed(0):0;
+                        return(
+                          <div key={d.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer"}} onClick={()=>setCatModal(d.cat)}>
+                            <div style={{width:10,height:10,borderRadius:2,background:d.color,flexShrink:0}}/>
+                            <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cats[d.cat]?.icon} {d.cat}</span>
+                            <span style={{fontSize:11,color:"#64748b",flexShrink:0,minWidth:28,textAlign:"right"}}>{pct}%</span>
+                            <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0,minWidth:45,textAlign:"right"}}>{fE0(d.val)}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </Card>
@@ -786,7 +797,7 @@ export default function App(){
                             onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[cat]:v}}));}}/>
                         ):<span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>/{fE0(orc)}</span>}
                       </div>
-                      {orc>0&&<><PBar val={net} max={orc} color={cfg.color}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{(net/orc*100).toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":"#64748b"}}>{over?`+${fE0(net-orc)} acima`:`${fE0(orc-net)} livre`}</span></div></>}
+                      {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":"#64748b"}}>{over?`+${fE0(net-orc)} acima`:`${fE0(orc-net)} livre`}</span></div></>})()}
                       {/* Subcategories */}
                       {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
                         <div key={sub} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 30px",marginTop:3}}>
@@ -883,7 +894,7 @@ export default function App(){
               {/* Lista compacta estilo Boonzi */}
               <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:16,overflow:"hidden"}}>
                 {/* Header */}
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"80px 1fr":"90px 1fr 130px 130px 80px",gap:8,padding:"10px 14px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 2fr 160px 150px 100px",gap:8,padding:"10px 16px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
                   {["Data","Descrição / Entidade",isMobile?"":"Categoria",isMobile?"":"Subcategoria","Valor"].filter(Boolean).map(h=>(
                     <span key={h} style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
                   ))}
@@ -898,7 +909,7 @@ export default function App(){
                   return(
                     <div key={t.id} style={{borderBottom:"1px solid #0a1220"}}>
                       {/* Compact row */}
-                      <div style={{display:"grid",gridTemplateColumns:isMobile?"80px 1fr":"90px 1fr 130px 130px 80px",gap:8,padding:"9px 14px",alignItems:"center",background:!t.ok?"rgba(239,68,68,0.04)":isPrefilled?"transparent":"rgba(59,130,246,0.04)",cursor:"pointer"}}
+                      <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 2fr 160px 150px 100px",gap:8,padding:"9px 16px",alignItems:"center",background:!t.ok?"rgba(239,68,68,0.06)":isPrefilled?"transparent":"rgba(59,130,246,0.04)",cursor:"pointer"}}
                         onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],expanded:!isExpanded}}))}>
                         <span style={{fontSize:11,color:"#64748b",fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
                         <div style={{minWidth:0}}>
@@ -980,8 +991,9 @@ export default function App(){
                   </div>
                   <div style={{display:"flex",gap:8}}>
                     <input type="number" placeholder="Novo saldo..." style={{flex:1,fontSize:14}}
-                      onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldo:v}:x));e.target.value="";}}
-                      onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(e.target.value);if(!isNaN(v)){setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldo:v}:x));e.target.value=""}}}}/>
+                      onChange={e=>e.target._val=e.target.value}
+                      onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldo:v}:x));e.target.value="";}}}
+                      onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(e.target.value);if(!isNaN(v)){setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldo:v}:x));e.target.value="";e.target.blur();}}}}/>
                     <button onClick={()=>setContas(prev=>prev.filter(x=>x.id!==c.id))} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"10px 14px",borderRadius:10}}>×</button>
                   </div>
                 </div>
