@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 const CLIENT_ID = "111962359632-serj2ine76p1avehb9csg30llbnjqadu.apps.googleusercontent.com";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
 const FILE_NAME = "financa_dados.json";
+const SHARED_FILE_ID = "1aGjdp4SxYdMtcrSR5hZTVb3ZFrrBJNls"; // ID fixo do ficheiro partilhado
 
 function useDriveSync(data, onLoad) {
   const [status, setStatus] = useState("idle");
@@ -49,12 +50,28 @@ function useDriveSync(data, onLoad) {
 
   const findOrLoad = async token => {
     try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id)`, { headers: { Authorization: `Bearer ${token}` } });
+      // Always try the shared master file first
+      const masterRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (masterRes.ok) {
+        const json = await masterRes.json();
+        onLoad(json);
+        setFileId(SHARED_FILE_ID);
+        setStatus("synced");
+        return;
+      }
+      // Fallback: search for file in user's own Drive
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id)`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       const { files } = await res.json();
       if (files?.length > 0) {
         const fid = files[0].id; setFileId(fid);
-        const content = await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
-        const json = await content.json();
+        const c2 = await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await c2.json();
         onLoad(json);
       }
       setStatus("synced");
@@ -66,18 +83,21 @@ function useDriveSync(data, onLoad) {
     setStatus("saving");
     try {
       const body = JSON.stringify(payload);
-      let url, method;
-      if (fid) {
-        url = `https://www.googleapis.com/upload/drive/v3/files/${fid}?uploadType=media`;
-        method = "PATCH";
-      } else {
-        const meta = await fetch("https://www.googleapis.com/drive/v3/files", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ name: FILE_NAME, mimeType: "application/json" }) });
-        const { id } = await meta.json();
-        setFileId(id);
-        url = `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`;
-        method = "PATCH";
-      }
-      await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
+      // Always save to shared file ID if available
+      const targetId = fid || SHARED_FILE_ID;
+      let url = `https://www.googleapis.com/upload/drive/v3/files/${targetId}?uploadType=media`;
+      const res = await fetch(url, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
+      if (res.ok) { setStatus("synced"); return; }
+      // If shared file fails (no write permission), create own file
+      const meta = await fetch("https://www.googleapis.com/drive/v3/files", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: FILE_NAME, mimeType: "application/json" })
+      });
+      const { id } = await meta.json();
+      setFileId(id);
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
+        { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
       setStatus("synced");
     } catch { setStatus("error"); }
   }, []);
