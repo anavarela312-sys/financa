@@ -383,11 +383,15 @@ export default function App(){
   const processar=useCallback(text=>{
     const novas=parseLines(text,cats);
     if(!novas.length){setImportMsg("Nenhuma transação encontrada.");return;}
-    const semCat=novas.filter(t=>!t.ok),comCat=novas.filter(t=>t.ok);
-    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...comCat.filter(t=>!ids.has(t.desc+t.data+t.val))];});
-    if(semCat.length){setPend(semCat);setTab("categorizar");}else setTab("transacoes");
-    setImportMsg(`${novas.length} importadas · ${comCat.length} auto · ${semCat.length} a confirmar`);
-  },[cats,setTrans,setPend]);
+    const existingIds=new Set(trans.map(t=>t.desc+t.data+t.val));
+    const novasFiltradas=novas.filter(t=>!existingIds.has(t.desc+t.data+t.val));
+    if(!novasFiltradas.length){setImportMsg("Sem movimentos novos — já importados anteriormente.");return;}
+    setPend(novasFiltradas);
+    setTab("categorizar");
+    const preench=novasFiltradas.filter(t=>t.ok).length;
+    const semCat=novasFiltradas.filter(t=>!t.ok).length;
+    setImportMsg(`${novasFiltradas.length} movimentos para rever · ${preench} pré-preenchidos · ${semCat} por categorizar`);
+  },[cats,trans,setPend]);
 
   const handleFile=f=>{if(!f)return;const r=new FileReader();r.onload=e=>processar(e.target.result);r.readAsText(f,"utf-8");};
   const isInt=t=>t.cat==="Transferência Interna"||t.cat==="Poupança";
@@ -451,12 +455,28 @@ export default function App(){
 
   const confirmP=id=>{
     const ed=pEd[id]||{},t=pend.find(p=>p.id===id);if(!t)return;
-    const catFinal=ed.cat||"Vários / Extras";
-    // If new cat/sub, add to cats
+    // Use edited values OR original auto-detected values
+    const catFinal=ed.cat!==undefined?ed.cat:t.cat;
+    const subFinal=ed.sub!==undefined?ed.sub:t.sub;
+    const entFinal=ed.ent!==undefined?ed.ent:t.ent;
     if(ed.newCatName){const c={...cats};c[ed.newCatName]={icon:ed.newCatIcon||"📌",color:ed.newCatColor||"#3b82f6",subs:ed.newCatSub?[ed.newCatSub]:[]};setCats(c);}
-    if(ed.cat&&ed.newSubName&&cats[ed.cat]){const c={...cats};c[ed.cat]={...c[ed.cat],subs:[...c[ed.cat].subs,ed.newSubName]};setCats(c);}
-    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));const n={...t,cat:catFinal,sub:ed.sub||"",ent:ed.ent??t.ent,data:ed.data||t.data,nota:ed.nota||"",ok:true};return ids.has(n.desc+n.data+n.val)?prev:[...prev,n];});
+    if(catFinal&&ed.newSubName&&cats[catFinal]){const c={...cats};c[catFinal]={...c[catFinal],subs:[...c[catFinal].subs,ed.newSubName]};setCats(c);}
+    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));const n={...t,cat:catFinal,sub:subFinal,ent:entFinal,data:ed.data||t.data,nota:ed.nota||t.nota||"",ok:true};return ids.has(n.desc+n.data+n.val)?prev:[...prev,n];});
     const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");
+  };
+
+  // Confirm all pre-filled at once
+  const confirmAll=()=>{
+    const toConfirm=pend.filter(t=>t.ok&&!pEd[t.id]?.cat===undefined);
+    const preenchidos=pend.filter(t=>t.ok);
+    setTrans(prev=>{
+      const ids=new Set(prev.map(t=>t.desc+t.data+t.val));
+      const novos=preenchidos.filter(t=>!ids.has(t.desc+t.data+t.val));
+      return[...prev,...novos];
+    });
+    const remaining=pend.filter(t=>!t.ok);
+    setPend(remaining);
+    if(!remaining.length)setTab("transacoes");
   };
   const markInt=id=>{const t=pend.find(p=>p.id===id);if(!t)return;setTrans(prev=>[...prev,{...t,cat:"Transferência Interna",sub:"Outro",ok:true}]);const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");};
   const ignP=id=>{const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");};
@@ -841,68 +861,104 @@ export default function App(){
             </div>
           )}
 
-          {/* CATEGORIZAR */}
+          {/* CATEGORIZAR — estilo Boonzi: lista com pré-preenchimento */}
           {tab==="categorizar"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Categorizar</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>{pend.length} por confirmar</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Categorizar movimentos</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>{pend.length} movimentos · {pend.filter(t=>t.ok).length} pré-preenchidos · {pend.filter(t=>!t.ok).length} por categorizar</p></>}
               {!pend.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Tudo categorizado ✓</p></Card>}
-              {pend.map(t=>{
-                const ed=pEd[t.id]||{};
-                const catA=ed.cat||t.cat||"";
-                const showNewSub=ed.addNewSub;
-                const showNewCatForm=ed.addNewCat;
-                return(
-                  <Card key={t.id}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
-                      <div style={{flex:1,minWidth:0}}><p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p><p style={{fontSize:11,color:"#64748b"}}>{t.dataOrig} · {t.tipo==="d"?"-":"+"}{fE(t.val)}</p></div>
-                      <Chip label={t.tipo==="d"?"débito":"crédito"} color={t.tipo==="d"?"#ef4444":"#22c55e"} sm/>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-                      <div><Lbl>Data</Lbl><input type="date" defaultValue={t.data} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],data:e.target.value}}))} /></div>
-                      <div><Lbl>Entidade</Lbl><input type="text" defaultValue={t.ent} placeholder="Ex: Continente" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],ent:e.target.value}}))} /></div>
-                    </div>
-                    {/* Category + option to create new */}
-                    {!showNewCatForm?(
-                      <div style={{marginBottom:8}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Lbl>Categoria</Lbl><button onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],addNewCat:true}}))} style={{background:"none",border:"none",color:"#3b82f6",fontSize:11,cursor:"pointer"}}>+ Nova categoria</button></div>
-                        <select defaultValue={catA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],cat:e.target.value,sub:"",addNewSub:false}}))}>
-                          <option value="">Selecionar...</option>{Object.keys(cats).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
-                        </select>
-                      </div>
-                    ):(
-                      <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:10,marginBottom:8}}>
-                        <p style={{fontSize:12,fontWeight:600,color:"#3b82f6",marginBottom:8}}>Nova categoria</p>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                          <div><Lbl>Nome</Lbl><input placeholder="Ex: Viagens" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],newCatName:e.target.value,cat:e.target.value}}))} /></div>
-                          <div><Lbl>Ícone</Lbl><input placeholder="✈️" defaultValue="📌" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],newCatIcon:e.target.value}}))} /></div>
-                          <div><Lbl>Cor</Lbl><input type="color" defaultValue="#3b82f6" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],newCatColor:e.target.value}}))} style={{height:40,padding:4}}/></div>
-                          <div><Lbl>Subcategoria inicial</Lbl><input placeholder="Ex: Voos" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],newCatSub:e.target.value,sub:e.target.value}}))} /></div>
+              {pend.length>0&&(
+                <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                  <Btn variant="success" style={{fontSize:12,padding:"8px 16px"}} onClick={()=>{
+                    const preench=pend.filter(t=>t.ok);
+                    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...preench.filter(t=>!ids.has(t.desc+t.data+t.val))];});
+                    setPend(pend.filter(t=>!t.ok));
+                    if(pend.filter(t=>!t.ok).length===0)setTab("transacoes");
+                  }}>✓ Confirmar {pend.filter(t=>t.ok).length} pré-preenchidos</Btn>
+                  <Btn variant="primary" style={{fontSize:12,padding:"8px 16px"}} onClick={()=>{
+                    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...pend.filter(t=>!ids.has(t.desc+t.data+t.val))];});
+                    setPend([]);setTab("transacoes");
+                  }}>✓✓ Confirmar todos ({pend.length})</Btn>
+                </div>
+              )}
+              {/* Lista compacta estilo Boonzi */}
+              <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:16,overflow:"hidden"}}>
+                {/* Header */}
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"80px 1fr":"90px 1fr 130px 130px 80px",gap:8,padding:"10px 14px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
+                  {["Data","Descrição / Entidade",isMobile?"":"Categoria",isMobile?"":"Subcategoria","Valor"].filter(Boolean).map(h=>(
+                    <span key={h} style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
+                  ))}
+                </div>
+                {pend.map(t=>{
+                  const ed=pEd[t.id]||{};
+                  const catA=ed.cat!==undefined?ed.cat:t.cat;
+                  const subA=ed.sub!==undefined?ed.sub:t.sub;
+                  const entA=ed.ent!==undefined?ed.ent:t.ent;
+                  const isExpanded=ed.expanded;
+                  const isPrefilled=t.ok&&!isExpanded;
+                  return(
+                    <div key={t.id} style={{borderBottom:"1px solid #0a1220"}}>
+                      {/* Compact row */}
+                      <div style={{display:"grid",gridTemplateColumns:isMobile?"80px 1fr":"90px 1fr 130px 130px 80px",gap:8,padding:"9px 14px",alignItems:"center",background:!t.ok?"rgba(239,68,68,0.04)":isPrefilled?"transparent":"rgba(59,130,246,0.04)",cursor:"pointer"}}
+                        onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],expanded:!isExpanded}}))}>
+                        <span style={{fontSize:11,color:"#64748b",fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
+                        <div style={{minWidth:0}}>
+                          <p style={{fontSize:12,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.ok?"#e2e8f0":"#94a3b8"}}>{entA||t.desc}</p>
+                          <p style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
                         </div>
-                        <button onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],addNewCat:false}}))} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer"}}>← Cancelar</button>
-                      </div>
-                    )}
-                    {/* Subcategory + option to add new */}
-                    {!showNewCatForm&&catA&&(
-                      <div style={{marginBottom:8}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Lbl>Subcategoria</Lbl><button onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],addNewSub:true}}))} style={{background:"none",border:"none",color:"#3b82f6",fontSize:11,cursor:"pointer"}}>+ Nova sub</button></div>
-                        {showNewSub?(
-                          <input placeholder="Nome da nova subcategoria..." onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],newSubName:e.target.value,sub:e.target.value}}))} />
-                        ):(
-                          <select defaultValue={ed.sub||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],sub:e.target.value}}))}>
-                            <option value="">—</option>{(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
-                          </select>
+                        {!isMobile&&(
+                          <>
+                            <div onClick={e=>e.stopPropagation()}>
+                              <select value={catA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],cat:e.target.value,sub:""}}))}
+                                style={{fontSize:11,padding:"4px 6px",background:!catA?"rgba(239,68,68,0.1)":"#0f1d2e",borderColor:!catA?"rgba(239,68,68,0.4)":"#1e3048"}}>
+                                <option value="">-- categorizar --</option>
+                                {Object.keys(cats).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
+                              </select>
+                            </div>
+                            <div onClick={e=>e.stopPropagation()}>
+                              <select value={subA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],sub:e.target.value}}))}
+                                style={{fontSize:11,padding:"4px 6px"}}>
+                                <option value="">—</option>
+                                {(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                          </>
                         )}
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:4}}>
+                          <span style={{fontSize:12,fontWeight:600,color:t.tipo==="c"?"#22c55e":"#e2e8f0",whiteSpace:"nowrap"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
+                          <span style={{fontSize:10,color:"#64748b"}}>{isExpanded?"▲":"▼"}</span>
+                        </div>
                       </div>
-                    )}
-                    <div style={{marginBottom:10}}><Lbl>Nota</Lbl><input type="text" placeholder="Nota opcional..." onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],nota:e.target.value}}))} /></div>
-                    <div style={{display:"flex",gap:8}}>
-                      <Btn variant="primary" style={{flex:1,fontSize:13}} onClick={()=>confirmP(t.id)}>✓ Confirmar</Btn>
-                      <Btn style={{fontSize:13}} onClick={()=>markInt(t.id)}>↔ Interna</Btn>
-                      <Btn variant="danger" style={{fontSize:13,padding:"10px 12px"}} onClick={()=>ignP(t.id)}>×</Btn>
+                      {/* Expanded detail */}
+                      {isExpanded&&(
+                        <div style={{padding:"12px 14px",background:"#070d1a",borderTop:"1px solid #1e3048"}}>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                            <div><Lbl>Data</Lbl><input type="date" defaultValue={t.data} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],data:e.target.value}}))} /></div>
+                            <div><Lbl>Entidade</Lbl><input type="text" defaultValue={entA} placeholder="Ex: Continente" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],ent:e.target.value}}))} /></div>
+                            {isMobile&&<>
+                              <div><Lbl>Categoria</Lbl>
+                                <select value={catA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],cat:e.target.value,sub:""}}))}>
+                                  <option value="">Selecionar...</option>{Object.keys(cats).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
+                                </select>
+                              </div>
+                              <div><Lbl>Subcategoria</Lbl>
+                                <select value={subA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],sub:e.target.value}}))}>
+                                  <option value="">—</option>{(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </div>
+                            </>}
+                            <div style={{gridColumn:"1/-1"}}><Lbl>Nota</Lbl><input type="text" defaultValue={t.nota} placeholder="Nota opcional..." onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],nota:e.target.value}}))} /></div>
+                          </div>
+                          <div style={{display:"flex",gap:8}}>
+                            <Btn variant="primary" style={{flex:1,fontSize:12,padding:"8px"}} onClick={()=>confirmP(t.id)}>✓ Confirmar</Btn>
+                            <Btn style={{fontSize:12,padding:"8px 12px"}} onClick={()=>markInt(t.id)}>↔ Interna</Btn>
+                            <Btn variant="danger" style={{fontSize:12,padding:"8px 12px"}} onClick={()=>ignP(t.id)}>×</Btn>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </Card>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
 
