@@ -9,9 +9,23 @@ function useDriveSync(data, onLoad) {
   const [status, setStatus] = useState("idle");
   const [tokenClient, setTokenClient] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
-  const [fileId, setFileId] = useState(null);
   const saveTimer = useRef(null);
   const isConnected = !!accessToken;
+
+  const onToken = useCallback(async (token) => {
+    setAccessToken(token);
+    localStorage.setItem("fin_drive_was_connected", "1");
+    setStatus("loading");
+    try {
+      // Always load the shared master file
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) { const json = await res.json(); onLoad(json); }
+      setStatus("synced");
+    } catch { setStatus("error"); }
+  }, [onLoad]);
 
   useEffect(() => {
     const loadScript = src => new Promise(res => {
@@ -25,93 +39,48 @@ function useDriveSync(data, onLoad) {
       window.gapi.load("client", async () => {
         await window.gapi.client.init({});
         const tc = window.google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID, scope: SCOPES,
-          prompt: "",
+          client_id: CLIENT_ID,
+          scope: SCOPES,
           callback: async resp => {
-            if (resp.error) { setStatus("error"); return; }
-            setAccessToken(resp.access_token);
-            window.gapi.client.setToken({ access_token: resp.access_token });
-            localStorage.setItem("fin_drive_was_connected", "1");
-            setStatus("loading");
-            await findOrLoad(resp.access_token);
+            if (resp.error || !resp.access_token) { setStatus("error"); return; }
+            await onToken(resp.access_token);
           },
         });
         setTokenClient(tc);
-        // Auto-reconnect silently if user has connected before
-        const wasConnected = localStorage.getItem("fin_drive_was_connected");
-        if (wasConnected) {
-          setTimeout(() => {
-            try { tc.requestAccessToken({ prompt: "none" }); } catch(e) {}
-          }, 500);
+        // Auto-reconnect silently on load
+        if (localStorage.getItem("fin_drive_was_connected")) {
+          setTimeout(() => { try { tc.requestAccessToken({ prompt: "none" }); } catch(e) { setStatus("idle"); } }, 600);
         }
       });
     });
-  }, []);
+  }, [onToken]);
 
-  const findOrLoad = async token => {
-    try {
-      // Try with auth token first (works for both owner and editor)
-      const masterRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (masterRes.ok) {
-        const json = await masterRes.json();
-        onLoad(json);
-        setFileId(SHARED_FILE_ID);
-        setStatus("synced");
-        return;
-      }
-      // Fallback: try public export URL (for publicly shared files)
-      const pubRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media&key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY`
-      );
-      if (pubRes.ok) {
-        const json = await pubRes.json();
-        onLoad(json);
-        setFileId(SHARED_FILE_ID);
-        setStatus("synced");
-        return;
-      }
-      setStatus("synced");
-    } catch { setStatus("error"); }
-  };
-
-  const saveToDrive = useCallback(async (payload, token, fid) => {
-    if (!token) return;
-    setStatus("saving");
-    try {
-      const body = JSON.stringify(payload);
-      // Always save to shared file ID if available
-      const targetId = fid || SHARED_FILE_ID;
-      let url = `https://www.googleapis.com/upload/drive/v3/files/${targetId}?uploadType=media`;
-      const res = await fetch(url, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
-      if (res.ok) { setStatus("synced"); return; }
-      // If shared file fails (no write permission), create own file
-      const meta = await fetch("https://www.googleapis.com/drive/v3/files", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: FILE_NAME, mimeType: "application/json" })
-      });
-      const { id } = await meta.json();
-      setFileId(id);
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
-        { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
-      setStatus("synced");
-    } catch { setStatus("error"); }
-  }, []);
-
+  // Auto-save with debounce
   useEffect(() => {
     if (!accessToken || !data) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveToDrive(data, accessToken, fileId), 2500);
+    saveTimer.current = setTimeout(async () => {
+      setStatus("saving");
+      try {
+        await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${SHARED_FILE_ID}?uploadType=media`,
+          { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(data) }
+        );
+        setStatus("synced");
+      } catch { setStatus("error"); }
+    }, 2500);
     return () => clearTimeout(saveTimer.current);
-  }, [data, accessToken, fileId, saveToDrive]);
+  }, [data, accessToken]);
 
-  const signIn = () => { if (tokenClient) tokenClient.requestAccessToken(); };
-  const signOut = () => { if (accessToken) window.google?.accounts?.oauth2?.revoke(accessToken); setAccessToken(null); setFileId(null); setStatus("idle"); localStorage.removeItem("fin_drive_was_connected"); };
+  const signIn = () => { if (tokenClient) tokenClient.requestAccessToken({ prompt: "" }); };
+  const signOut = () => {
+    if (accessToken) window.google?.accounts?.oauth2?.revoke(accessToken);
+    setAccessToken(null);
+    setStatus("idle");
+    localStorage.removeItem("fin_drive_was_connected");
+  };
 
-  return { status, signIn, signOut, isConnected, fileId };
+  return { status, signIn, signOut, isConnected, fileId: SHARED_FILE_ID };
 }
 
 function DriveBtn({ status, isConnected, onSignIn, onSignOut }) {
