@@ -9,23 +9,35 @@ function useDriveSync(data, onLoad) {
   const [status, setStatus] = useState("idle");
   const [tokenClient, setTokenClient] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  const [driveLoaded, setDriveLoaded] = useState(false); // KEY: only save AFTER loading
   const saveTimer = useRef(null);
   const isConnected = !!accessToken;
 
-  const onToken = useCallback(async (token) => {
-    setAccessToken(token);
-    localStorage.setItem("fin_drive_was_connected", "1");
+  const loadFromDrive = useCallback(async (token) => {
     setStatus("loading");
     try {
-      // Always load the shared master file
       const res = await fetch(
         `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.ok) { const json = await res.json(); onLoad(json); }
+      if (res.ok) {
+        const json = await res.json();
+        // Only load if Drive has actual data (not empty)
+        if (json && (json.trans?.length > 0 || json.contas?.length > 0)) {
+          onLoad(json);
+        }
+      }
       setStatus("synced");
+      // Only start saving after a delay to let state settle
+      setTimeout(() => setDriveLoaded(true), 3000);
     } catch { setStatus("error"); }
   }, [onLoad]);
+
+  const onToken = useCallback(async (token) => {
+    setAccessToken(token);
+    localStorage.setItem("fin_drive_was_connected", "1");
+    await loadFromDrive(token);
+  }, [loadFromDrive]);
 
   useEffect(() => {
     const loadScript = src => new Promise(res => {
@@ -47,7 +59,6 @@ function useDriveSync(data, onLoad) {
           },
         });
         setTokenClient(tc);
-        // Auto-reconnect silently on load
         if (localStorage.getItem("fin_drive_was_connected")) {
           setTimeout(() => { try { tc.requestAccessToken({ prompt: "none" }); } catch(e) { setStatus("idle"); } }, 600);
         }
@@ -55,9 +66,9 @@ function useDriveSync(data, onLoad) {
     });
   }, [onToken]);
 
-  // Auto-save with debounce
+  // Auto-save — ONLY after Drive data has been loaded (driveLoaded=true)
   useEffect(() => {
-    if (!accessToken || !data) return;
+    if (!accessToken || !data || !driveLoaded) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setStatus("saving");
@@ -70,12 +81,13 @@ function useDriveSync(data, onLoad) {
       } catch { setStatus("error"); }
     }, 2500);
     return () => clearTimeout(saveTimer.current);
-  }, [data, accessToken]);
+  }, [data, accessToken, driveLoaded]);
 
   const signIn = () => { if (tokenClient) tokenClient.requestAccessToken({ prompt: "" }); };
   const signOut = () => {
     if (accessToken) window.google?.accounts?.oauth2?.revoke(accessToken);
     setAccessToken(null);
+    setDriveLoaded(false);
     setStatus("idle");
     localStorage.removeItem("fin_drive_was_connected");
   };
@@ -621,6 +633,20 @@ export default function App(){
   const monthsLeft=Math.max(0,Math.ceil((10500-appSaldo)/(800+simExtra)));
   const latestSnap=snaps[snaps.length-1];
   const deviation=latestSnap.actual-latestSnap.planned;
+  // Auto-calculate Millennium saldo from all confirmed transactions
+  const millSaldo = useMemo(() => {
+    const allT = trans.filter(t => !isInt(t));
+    const totalRec = allT.filter(t => t.tipo === "c").reduce((a,t) => a+t.val, 0);
+    const totalDesp = allT.filter(t => t.tipo === "d").reduce((a,t) => a+t.val, 0);
+    return totalRec - totalDesp;
+  }, [trans]);
+
+  // Sync Millennium saldo automatically
+  useEffect(() => {
+    if (!trans.length) return;
+    setContas(prev => prev.map(c => c.id === "mill" ? {...c, saldo: millSaldo} : c));
+  }, [millSaldo]);
+
   const patrimonioTotal=contas.reduce((a,c)=>a+c.saldo,0);
 
   // Filtered transactions for list
@@ -1089,7 +1115,7 @@ export default function App(){
               {/* Lista compacta estilo Boonzi */}
               <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:16,overflow:"hidden"}}>
                 {/* Header */}
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 2fr 160px 150px 100px",gap:8,padding:"10px 16px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 1fr 180px 160px 100px",gap:8,padding:"10px 16px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
                   {["Data","Descrição / Entidade",isMobile?"":"Categoria",isMobile?"":"Subcategoria","Valor"].filter(Boolean).map(h=>(
                     <span key={h} style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
                   ))}
@@ -1104,7 +1130,7 @@ export default function App(){
                   return(
                     <div key={t.id} style={{borderBottom:"1px solid #0a1220"}}>
                       {/* Compact row */}
-                      <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 2fr 160px 150px 100px",gap:8,padding:"9px 16px",alignItems:"center",background:!t.ok?"rgba(239,68,68,0.06)":isPrefilled?"transparent":"rgba(59,130,246,0.04)",cursor:"pointer"}}
+                      <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 1fr 180px 160px 100px",gap:8,padding:"9px 16px",alignItems:"center",background:!t.ok?"rgba(239,68,68,0.06)":isPrefilled?"transparent":"rgba(59,130,246,0.04)",cursor:"pointer"}}
                         onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],expanded:!isExpanded}}))}>
                         <span style={{fontSize:11,color:"#64748b",fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
                         <div style={{minWidth:0}}>
