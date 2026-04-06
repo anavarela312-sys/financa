@@ -41,8 +41,8 @@ function useDriveSync(data, onLoad) {
         const wasConnected = localStorage.getItem("fin_drive_was_connected");
         if (wasConnected) {
           setTimeout(() => {
-            tc.requestAccessToken({ prompt: "" });
-          }, 800);
+            try { tc.requestAccessToken({ prompt: "none" }); } catch(e) {}
+          }, 500);
         }
       });
     });
@@ -50,7 +50,7 @@ function useDriveSync(data, onLoad) {
 
   const findOrLoad = async token => {
     try {
-      // Always try the shared master file first
+      // Try with auth token first (works for both owner and editor)
       const masterRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -62,17 +62,16 @@ function useDriveSync(data, onLoad) {
         setStatus("synced");
         return;
       }
-      // Fallback: search for file in user's own Drive
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id)`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      // Fallback: try public export URL (for publicly shared files)
+      const pubRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${SHARED_FILE_ID}?alt=media&key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY`
       );
-      const { files } = await res.json();
-      if (files?.length > 0) {
-        const fid = files[0].id; setFileId(fid);
-        const c2 = await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
-        const json = await c2.json();
+      if (pubRes.ok) {
+        const json = await pubRes.json();
         onLoad(json);
+        setFileId(SHARED_FILE_ID);
+        setStatus("synced");
+        return;
       }
       setStatus("synced");
     } catch { setStatus("error"); }
@@ -743,10 +742,7 @@ export default function App(){
           <h1 style={{fontSize:isMobile?34:44,fontWeight:300,color:"#fff",letterSpacing:-2,marginBottom:6}}>finança<span style={{color:"#3b82f6",fontWeight:600}}>.</span></h1>
           <p style={{fontSize:13,color:"#64748b"}}>Hub financeiro pessoal · Ana · 2026</p>
           <div style={{marginTop:12}}><DriveBtn status={driveStatus} isConnected={isConnected} onSignIn={signIn} onSignOut={signOut}/></div>
-          {isGuest&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,0.1)",borderRadius:8,display:"flex",gap:8,alignItems:"center"}}>
-            <span style={{fontSize:11,color:"#22c55e"}}>👁️ Modo leitura — dados da Ana</span>
-            <button onClick={stopGuest} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Sair</button>
-          </div>}
+
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:480,marginBottom:24}}>
           <div onClick={()=>setScreen("gestao")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
@@ -783,8 +779,6 @@ export default function App(){
             <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total</p>
             <p style={{fontSize:26,fontWeight:600,color:"#fff"}}>{fE(patrimonioTotal)}</p>
           </div>
-          {isConnected&&<SharePanel shareCode={shareCode} shareStatus={shareStatus} generateShareCode={generateShareCode} fileId={driveFileId} accessToken={null}/>}
-          {!isConnected&&!isGuest&&<GuestPanel onLoad={handleDriveLoad}/>}
           <div style={{display:"flex",gap:8,marginTop:10}}>
             <button onClick={exportJSON} style={{flex:1,padding:"10px",background:"rgba(59,130,246,0.1)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,fontSize:12}}>↓ Exportar backup</button>
             <label style={{flex:1,padding:"10px",background:"rgba(255,255,255,0.04)",color:"#94a3b8",border:"1px solid #1e3048",borderRadius:10,fontSize:12,cursor:"pointer",textAlign:"center",display:"block"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
@@ -909,10 +903,7 @@ export default function App(){
         {/* Main */}
         <div style={{flex:1,padding:mainPad,overflowY:"auto",minWidth:0}} className="fade">
 
-          {isReadOnly&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"8px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,color:"#22c55e"}}>👁️ Modo leitura — dados da Ana</span>
-            <button onClick={stopGuest} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Sair</button>
-          </div>}
+
           {isMobile&&(
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <div>
