@@ -462,7 +462,20 @@ export default function App(){
     const entFinal=ed.ent!==undefined?ed.ent:t.ent;
     if(ed.newCatName){const c={...cats};c[ed.newCatName]={icon:ed.newCatIcon||"📌",color:ed.newCatColor||"#3b82f6",subs:ed.newCatSub?[ed.newCatSub]:[]};setCats(c);}
     if(catFinal&&ed.newSubName&&cats[catFinal]){const c={...cats};c[catFinal]={...c[catFinal],subs:[...c[catFinal].subs,ed.newSubName]};setCats(c);}
-    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));const n={...t,cat:catFinal,sub:subFinal,ent:entFinal,data:ed.data||t.data,nota:ed.nota||t.nota||"",ok:true};return ids.has(n.desc+n.data+n.val)?prev:[...prev,n];});
+    const finalTrans={...t,cat:catFinal,sub:subFinal,ent:entFinal,data:ed.data||t.data,nota:ed.nota||t.nota||"",ok:true,contaOrigem:ed.contaOrigem||"",contaDestino:ed.contaDestino||""};
+    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return ids.has(finalTrans.desc+finalTrans.data+finalTrans.val)?prev:[...prev,finalTrans];});
+    // Update account balances if transfer between accounts
+    if(ed.contaOrigem&&ed.contaDestino){
+      setContas(prev=>prev.map(c=>{
+        if(c.id===ed.contaOrigem) return{...c,saldo:Math.max(0,c.saldo-t.val)};
+        if(c.id===ed.contaDestino) return{...c,saldo:c.saldo+t.val};
+        return c;
+      }));
+    } else if(catFinal==="Receita"&&ed.contaDestino){
+      setContas(prev=>prev.map(c=>c.id===ed.contaDestino?{...c,saldo:c.saldo+t.val}:c));
+    } else if(catFinal!=="Transferência Interna"&&catFinal!=="Receita"&&ed.contaOrigem){
+      setContas(prev=>prev.map(c=>c.id===ed.contaOrigem?{...c,saldo:Math.max(0,c.saldo-t.val)}:c));
+    }
     const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");
   };
 
@@ -738,22 +751,23 @@ export default function App(){
               {/* Pie chart + legend */}
               {pieData.length>0&&(
                 <Card>
-                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>Distribuição de despesas</p>
-                  <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:isMobile?"wrap":"nowrap"}}>
-                    <div style={{display:"flex",justifyContent:"center",flexShrink:0}}><PieChart data={pieData} size={isMobile?140:160}/></div>
-                    <div style={{flex:1,minWidth:0}}>
-                      {pieData.map(d=>{
-                        const total=pieData.reduce((a,x)=>a+x.val,0);
-                        const pct=total>0?((d.val/total)*100).toFixed(0):0;
+                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Distribuição de despesas</p>
+                  <div style={{display:"flex",flexDirection:isMobile?"column":"row",gap:20,alignItems:"center",justifyContent:"center"}}>
+                    <div style={{flexShrink:0}}>
+                      <PieChart data={pieData} size={isMobile?150:170}/>
+                    </div>
+                    <div style={{width:"100%",maxWidth:320}}>
+                      {(()=>{const total=pieData.reduce((a,x)=>a+x.val,0);return pieData.map(d=>{
+                        const pct=total>0?Math.round(d.val/total*100):0;
                         return(
-                          <div key={d.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",cursor:"pointer"}} onClick={()=>setCatModal(d.cat)}>
-                            <div style={{width:10,height:10,borderRadius:2,background:d.color,flexShrink:0}}/>
-                            <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cats[d.cat]?.icon} {d.cat}</span>
-                            <span style={{fontSize:11,color:"#64748b",flexShrink:0,minWidth:28,textAlign:"right"}}>{pct}%</span>
-                            <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0,minWidth:45,textAlign:"right"}}>{fE0(d.val)}</span>
+                          <div key={d.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #0d1a2e",cursor:"pointer"}} onClick={()=>setCatModal(d.cat)}>
+                            <div style={{width:10,height:10,borderRadius:3,background:d.color,flexShrink:0}}/>
+                            <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#e2e8f0"}}>{cats[d.cat]?.icon} {d.cat}</span>
+                            <span style={{fontSize:11,color:"#64748b",flexShrink:0,width:32,textAlign:"right"}}>{pct}%</span>
+                            <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0,width:52,textAlign:"right"}}>{fE0(d.val)}</span>
                           </div>
                         );
-                      })}
+                      });})()}
                     </div>
                   </div>
                 </Card>
@@ -957,11 +971,34 @@ export default function App(){
                                 </select>
                               </div>
                             </>}
-                            <div style={{gridColumn:"1/-1"}}><Lbl>Nota</Lbl><input type="text" defaultValue={t.nota} placeholder="Nota opcional..." onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],nota:e.target.value}}))} /></div>
+                            {(catA==="Transferência Interna"||catA==="Receita"||catA==="Poupança")&&(
+                            <div style={{gridColumn:"1/-1",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                              <div><Lbl>Conta origem</Lbl>
+                                <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
+                                  <option value="">— nenhuma —</option>
+                                  {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
+                                </select>
+                              </div>
+                              <div><Lbl>Conta destino</Lbl>
+                                <select value={ed.contaDestino||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaDestino:e.target.value}}))}>
+                                  <option value="">— nenhuma —</option>
+                                  {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                          {catA&&catA!=="Transferência Interna"&&catA!=="Receita"&&catA!=="Poupança"&&(
+                            <div style={{gridColumn:"1/-1"}}><Lbl>Conta (débito de)</Lbl>
+                              <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
+                                <option value="">— não actualizar saldo —</option>
+                                {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
+                              </select>
+                            </div>
+                          )}
+                          <div style={{gridColumn:"1/-1"}}><Lbl>Nota</Lbl><input type="text" defaultValue={t.nota} placeholder="Nota opcional..." onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],nota:e.target.value}}))} /></div>
                           </div>
                           <div style={{display:"flex",gap:8}}>
                             <Btn variant="primary" style={{flex:1,fontSize:12,padding:"8px"}} onClick={()=>confirmP(t.id)}>✓ Confirmar</Btn>
-                            <Btn style={{fontSize:12,padding:"8px 12px"}} onClick={()=>markInt(t.id)}>↔ Interna</Btn>
                             <Btn variant="danger" style={{fontSize:12,padding:"8px 12px"}} onClick={()=>ignP(t.id)}>×</Btn>
                           </div>
                         </div>
