@@ -398,9 +398,14 @@ export default function App(){
   ,[catData,orcMes]);
 
   const pieData=useMemo(()=>
-    Object.entries(catData).filter(([c])=>c!=="Receita"&&!isInt({cat:c})).map(([cat,d])=>({
-      cat,val:NET_CATS.has(cat)?Math.max(0,d.out-d.in):d.out,color:cats[cat]?.color||"#64748b"
-    })).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,8)
+    Object.entries(catData)
+      .filter(([c])=>c!==""&&c!=="Receita"&&c!=="Transferência Interna"&&c!=="Poupança")
+      .map(([cat,d])=>({
+        cat, val:NET_CATS.has(cat)?Math.max(0,d.out-d.in):d.out, color:cats[cat]?.color||"#64748b"
+      }))
+      .filter(d=>d.val>0)
+      .sort((a,b)=>b.val-a.val)
+      .slice(0,8)
   ,[catData,cats]);
 
   const appSaldo=contas.find(c=>c.id==="app")?.saldo||1350;
@@ -409,11 +414,20 @@ export default function App(){
   const latestSnap=snaps[snaps.length-1];
   const deviation=latestSnap.actual-latestSnap.planned;
   // Auto-calculate Millennium saldo from all confirmed transactions
+  // Receitas - Despesas - Transferências para outras contas (Apparte, XTB, etc.)
   const millSaldo = useMemo(() => {
-    const allT = trans.filter(t => !isInt(t));
-    const totalRec = allT.filter(t => t.tipo === "c").reduce((a,t) => a+t.val, 0);
-    const totalDesp = allT.filter(t => t.tipo === "d").reduce((a,t) => a+t.val, 0);
-    return totalRec - totalDesp;
+    if (!trans.length) return 0;
+    return trans.reduce((total, t) => {
+      if (t.cat === "Transferência Interna" || t.cat === "Poupança") {
+        // Money leaving Millennium to other accounts
+        if (t.tipo === "d") return total - t.val;
+        // Money coming back (rare)
+        if (t.tipo === "c") return total + t.val;
+      }
+      if (t.tipo === "c") return total + t.val;
+      if (t.tipo === "d") return total - t.val;
+      return total;
+    }, 0);
   }, [trans]);
 
   // Sync Millennium saldo automatically
