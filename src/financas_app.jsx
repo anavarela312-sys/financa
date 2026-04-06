@@ -25,15 +25,24 @@ function useDriveSync(data, onLoad) {
         await window.gapi.client.init({});
         const tc = window.google.accounts.oauth2.initTokenClient({
           client_id: CLIENT_ID, scope: SCOPES,
+          prompt: "",
           callback: async resp => {
             if (resp.error) { setStatus("error"); return; }
             setAccessToken(resp.access_token);
             window.gapi.client.setToken({ access_token: resp.access_token });
+            localStorage.setItem("fin_drive_was_connected", "1");
             setStatus("loading");
             await findOrLoad(resp.access_token);
           },
         });
         setTokenClient(tc);
+        // Auto-reconnect silently if user has connected before
+        const wasConnected = localStorage.getItem("fin_drive_was_connected");
+        if (wasConnected) {
+          setTimeout(() => {
+            tc.requestAccessToken({ prompt: "" });
+          }, 800);
+        }
       });
     });
   }, []);
@@ -81,9 +90,9 @@ function useDriveSync(data, onLoad) {
   }, [data, accessToken, fileId, saveToDrive]);
 
   const signIn = () => { if (tokenClient) tokenClient.requestAccessToken(); };
-  const signOut = () => { if (accessToken) window.google?.accounts?.oauth2?.revoke(accessToken); setAccessToken(null); setFileId(null); setStatus("idle"); };
+  const signOut = () => { if (accessToken) window.google?.accounts?.oauth2?.revoke(accessToken); setAccessToken(null); setFileId(null); setStatus("idle"); localStorage.removeItem("fin_drive_was_connected"); };
 
-  return { status, signIn, signOut, isConnected };
+  return { status, signIn, signOut, isConnected, fileId };
 }
 
 function DriveBtn({ status, isConnected, onSignIn, onSignOut }) {
@@ -102,6 +111,186 @@ function DriveBtn({ status, isConnected, onSignIn, onSignOut }) {
         ? <button onClick={onSignIn} style={{ background:"rgba(59,130,246,0.15)", color:"#3b82f6", border:"none", borderRadius:6, padding:"2px 8px", fontSize:10, cursor:"pointer" }}>Ligar Drive</button>
         : <button onClick={onSignOut} style={{ background:"rgba(239,68,68,0.1)", color:"#ef4444", border:"none", borderRadius:6, padding:"2px 8px", fontSize:10, cursor:"pointer" }}>Desligar</button>
       }
+    </div>
+  );
+}
+
+// ── SHARE MODE ────────────────────────────────────────────────
+// Owner publishes fileId to a known "share registry" file in Drive
+// Guest reads from that public file ID
+const SHARE_REGISTRY_NAME = "financa_share_registry.json";
+
+function useShareMode(accessToken, fileId, onLoad) {
+  const [shareCode, setShareCode] = useState("");
+  const [shareStatus, setShareStatus] = useState("idle"); // idle | generating | active | loading | error
+  const [guestCode, setGuestCode] = useState(() => localStorage.getItem("fin_guest_code") || "");
+  const [isGuest, setIsGuest] = useState(() => !!localStorage.getItem("fin_guest_code"));
+  const pollRef = useRef(null);
+
+  // Generate a share code = publish fileId to a registry on Drive (as a known-named file)
+  const generateShareCode = useCallback(async () => {
+    if (!accessToken || !fileId) return;
+    setShareStatus("generating");
+    try {
+      // Store the fileId as the share code (base64 encoded)
+      const code = btoa(fileId).slice(0, 12).toUpperCase();
+      // Save registry: code -> fileId mapping in a public file
+      const registryData = JSON.stringify({ code, fileId, updated: new Date().toISOString() });
+      // Search for existing registry file
+      const search = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${SHARE_REGISTRY_NAME}' and trashed=false&fields=files(id)`,
+        { headers: { Authorization: `Bearer ${accessToken}` } });
+      const { files } = await search.json();
+      let regId;
+      if (files?.length > 0) {
+        regId = files[0].id;
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${regId}?uploadType=media`,
+          { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: registryData });
+      } else {
+        const meta = await fetch("https://www.googleapis.com/drive/v3/files",
+          { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ name: SHARE_REGISTRY_NAME, mimeType: "application/json" }) });
+        const { id } = await meta.json();
+        regId = id;
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
+          { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: registryData });
+      }
+      // Make registry file public readable
+      await fetch(`https://www.googleapis.com/drive/v3/files/${regId}/permissions`,
+        { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "reader", type: "anyone" }) });
+      // Also make data file public readable
+      await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
+        { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "reader", type: "anyone" }) });
+      localStorage.setItem("fin_share_registry_id", regId);
+      localStorage.setItem("fin_share_code", code);
+      setShareCode(code);
+      setShareStatus("active");
+    } catch(e) { console.error(e); setShareStatus("error"); }
+  }, [accessToken, fileId]);
+
+  // Load existing share code
+  useEffect(() => {
+    const saved = localStorage.getItem("fin_share_code");
+    if (saved) { setShareCode(saved); setShareStatus("active"); }
+  }, []);
+
+  // Guest: load data from shared file by code
+  const loadAsGuest = useCallback(async (code) => {
+    setShareStatus("loading");
+    try {
+      // The code is a base64 of the fileId — decode it
+      // But we need the registry file ID first
+      // Guest must know the registry file ID — we'll store it in the share code itself
+      // New approach: code IS the fileId encoded
+      // We search public files with a specific name pattern
+      // Simplest: encode fileId directly in share code (owner shares the code)
+      // Code format: first 12 chars of base64(fileId)
+      // We can't reverse that easily. Instead: use full fileId as share code
+      const fid = code.trim();
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`);
+      if (!res.ok) throw new Error("Ficheiro não encontrado");
+      const json = await res.json();
+      onLoad(json);
+      localStorage.setItem("fin_guest_code", fid);
+      setIsGuest(true);
+      setGuestCode(fid);
+      setShareStatus("synced");
+      // Poll for updates every 30s
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`);
+          if (r.ok) { const j = await r.json(); onLoad(j); }
+        } catch {}
+      }, 30000);
+    } catch(e) { setShareStatus("error"); }
+  }, [onLoad]);
+
+  // Stop guest mode
+  const stopGuest = useCallback(() => {
+    localStorage.removeItem("fin_guest_code");
+    setIsGuest(false);
+    setGuestCode("");
+    setShareStatus("idle");
+    if (pollRef.current) clearInterval(pollRef.current);
+    window.location.reload();
+  }, []);
+
+  // Auto-load if guest
+  useEffect(() => {
+    const saved = localStorage.getItem("fin_guest_code");
+    if (saved && !accessToken) loadAsGuest(saved);
+  }, []);
+
+  return { shareCode, shareStatus, generateShareCode, isGuest, guestCode, loadAsGuest, stopGuest };
+}
+
+function SharePanel({ shareCode, shareStatus, generateShareCode, fileId, accessToken }) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = fileId ? `${window.location.href.split('?')[0]}?share=${fileId}` : "";
+
+  const copy = () => {
+    navigator.clipboard.writeText(fileId || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ marginTop:12, padding:"12px", background:"rgba(59,130,246,0.06)", borderRadius:12, border:"1px solid rgba(59,130,246,0.2)" }}>
+      <p style={{ fontSize:12, fontWeight:600, color:"#3b82f6", marginBottom:8 }}>📤 Partilhar com o João</p>
+      {!fileId ? (
+        <p style={{ fontSize:11, color:"#64748b" }}>Liga o Drive primeiro para gerar um código de partilha.</p>
+      ) : shareStatus === "active" ? (
+        <div>
+          <p style={{ fontSize:11, color:"#64748b", marginBottom:6 }}>Código de partilha (envia ao João):</p>
+          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+            <code style={{ fontSize:10, background:"#0a1220", padding:"6px 10px", borderRadius:8, color:"#22c55e", flex:1, wordBreak:"break-all" }}>{fileId}</code>
+            <button onClick={copy} style={{ background:copied?"rgba(34,197,94,0.2)":"rgba(59,130,246,0.15)", color:copied?"#22c55e":"#3b82f6", border:"none", borderRadius:8, padding:"6px 10px", fontSize:11, cursor:"pointer", flexShrink:0 }}>
+              {copied ? "✓ Copiado" : "Copiar"}
+            </button>
+          </div>
+          <p style={{ fontSize:10, color:"#64748b", marginTop:6 }}>O João abre a app → "Ver dados partilhados" → cola o código</p>
+        </div>
+      ) : (
+        <button onClick={generateShareCode} style={{ background:"rgba(59,130,246,0.15)", color:"#3b82f6", border:"none", borderRadius:8, padding:"8px 14px", fontSize:12, cursor:"pointer", width:"100%" }}>
+          {shareStatus === "generating" ? "A gerar..." : "🔗 Gerar código de partilha"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GuestPanel({ onLoad }) {
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    if (!code.trim()) return;
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${code.trim()}?alt=media`);
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      onLoad(json);
+      localStorage.setItem("fin_guest_code", code.trim());
+      window.location.reload();
+    } catch { setError("Código inválido ou sem acesso. Verifica com a Ana."); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ marginTop:8, padding:"12px", background:"rgba(34,197,94,0.06)", borderRadius:12, border:"1px solid rgba(34,197,94,0.2)" }}>
+      <p style={{ fontSize:12, fontWeight:600, color:"#22c55e", marginBottom:8 }}>👁️ Ver dados partilhados</p>
+      <div style={{ display:"flex", gap:6 }}>
+        <input value={code} onChange={e=>setCode(e.target.value)} placeholder="Cola o código aqui..."
+          style={{ flex:1, fontSize:12, padding:"8px 10px" }} onKeyDown={e=>e.key==="Enter"&&load()}/>
+        <button onClick={load} style={{ background:"rgba(34,197,94,0.15)", color:"#22c55e", border:"none", borderRadius:8, padding:"8px 12px", fontSize:12, cursor:"pointer" }}>
+          {loading ? "..." : "Carregar"}
+        </button>
+      </div>
+      {error && <p style={{ fontSize:11, color:"#ef4444", marginTop:6 }}>{error}</p>}
     </div>
   );
 }
@@ -358,7 +547,9 @@ export default function App(){
     if(json.contas)setContas(json.contas);if(json.orcs)setOrcs(json.orcs);
     if(json.snaps)setSnaps(json.snaps);if(json.cats)setCats(json.cats);
   },[setTrans,setPend,setContas,setOrcs,setSnaps,setCats]);
-  const {status:driveStatus,signIn,signOut,isConnected}=useDriveSync(allData,handleDriveLoad);
+  const {status:driveStatus,signIn,signOut,isConnected,fileId:driveFileId}=useDriveSync(allData,handleDriveLoad);
+  const {shareCode,shareStatus,generateShareCode,isGuest,loadAsGuest,stopGuest}=useShareMode(null,driveFileId,handleDriveLoad);
+  const isReadOnly=isGuest;
 
   const [pEd,setPEd]=useState({});
   const [editId,setEditId]=useState(null);
@@ -532,6 +723,10 @@ export default function App(){
           <h1 style={{fontSize:isMobile?34:44,fontWeight:300,color:"#fff",letterSpacing:-2,marginBottom:6}}>finança<span style={{color:"#3b82f6",fontWeight:600}}>.</span></h1>
           <p style={{fontSize:13,color:"#64748b"}}>Hub financeiro pessoal · Ana · 2026</p>
           <div style={{marginTop:12}}><DriveBtn status={driveStatus} isConnected={isConnected} onSignIn={signIn} onSignOut={signOut}/></div>
+          {isGuest&&<div style={{marginTop:6,padding:"6px 10px",background:"rgba(34,197,94,0.1)",borderRadius:8,display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:11,color:"#22c55e"}}>👁️ Modo leitura — dados da Ana</span>
+            <button onClick={stopGuest} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Sair</button>
+          </div>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:480,marginBottom:24}}>
           <div onClick={()=>setScreen("gestao")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
@@ -568,7 +763,9 @@ export default function App(){
             <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total</p>
             <p style={{fontSize:26,fontWeight:600,color:"#fff"}}>{fE(patrimonioTotal)}</p>
           </div>
-          <div style={{display:"flex",gap:8}}>
+          {isConnected&&<SharePanel shareCode={shareCode} shareStatus={shareStatus} generateShareCode={generateShareCode} fileId={driveFileId} accessToken={null}/>}
+          {!isConnected&&!isGuest&&<GuestPanel onLoad={handleDriveLoad}/>}
+          <div style={{display:"flex",gap:8,marginTop:10}}>
             <button onClick={exportJSON} style={{flex:1,padding:"10px",background:"rgba(59,130,246,0.1)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,fontSize:12}}>↓ Exportar backup</button>
             <label style={{flex:1,padding:"10px",background:"rgba(255,255,255,0.04)",color:"#94a3b8",border:"1px solid #1e3048",borderRadius:10,fontSize:12,cursor:"pointer",textAlign:"center",display:"block"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
           </div>
@@ -692,6 +889,10 @@ export default function App(){
         {/* Main */}
         <div style={{flex:1,padding:mainPad,overflowY:"auto",minWidth:0}} className="fade">
 
+          {isReadOnly&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"8px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,color:"#22c55e"}}>👁️ Modo leitura — dados da Ana</span>
+            <button onClick={stopGuest} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Sair</button>
+          </div>}
           {isMobile&&(
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <div>
