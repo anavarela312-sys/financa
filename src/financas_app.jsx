@@ -433,11 +433,7 @@ export default function App(){
   const [newSnap,setNewSnap]=useState("");
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
-  const [dismissedAlertsArr,setDismissedAlertsArr]=useLS("fin_dismissed_"+mesKey,[]);
-  const dismissedAlerts=useMemo(()=>new Set(dismissedAlertsArr),[dismissedAlertsArr]);
-  const dismissAlert=useCallback(cat=>{
-    setDismissedAlertsArr(prev=>[...new Set([...prev,cat])]);
-  },[setDismissedAlertsArr]);
+
   const [addManual,setAddManual]=useState(false);
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
   const [search,setSearch]=useState("");
@@ -452,6 +448,11 @@ export default function App(){
   const mesKey=`${fAno}-${String(fMes+1).padStart(2,"0")}`;
   const orcMes=orcs[mesKey]||{};
   const totalOrçamentado=Object.values(orcMes).reduce((a,b)=>a+b,0);
+  const [dismissedAlertsArr,setDismissedAlertsArr]=useLS("fin_dismissed_"+mesKey,[]);
+  const dismissedAlerts=useMemo(()=>new Set(dismissedAlertsArr),[dismissedAlertsArr]);
+  const dismissAlert=useCallback(cat=>{
+    setDismissedAlertsArr(prev=>[...new Set([...prev,cat])]);
+  },[setDismissedAlertsArr]);
 
   const processar=useCallback(text=>{
     const novas=parseLines(text,cats);
