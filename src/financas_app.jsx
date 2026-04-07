@@ -435,6 +435,7 @@ export default function App(){
   const [addManual,setAddManual]=useState(false);
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
   const [search,setSearch]=useState("");
+  const [searchVal,setSearchVal]=useState("");
   const [dateFrom,setDateFrom]=useState("");
   const [dateTo,setDateTo]=useState("");
   const [catModal,setCatModal]=useState(null); // cat name to show transactions
@@ -549,9 +550,10 @@ export default function App(){
       if(search&&!t.desc.toLowerCase().includes(search.toLowerCase())&&!t.ent.toLowerCase().includes(search.toLowerCase())&&!t.cat.toLowerCase().includes(search.toLowerCase())) return false;
       if(dateFrom&&t.data<dateFrom) return false;
       if(dateTo&&t.data>dateTo) return false;
+      if(searchVal){const sv=parseFloat(searchVal);if(!isNaN(sv)&&Math.abs(t.val-sv)>0.01) return false;}
       return true;
     });
-  },[transMesWithBalance,search,dateFrom,dateTo]);
+  },[transMesWithBalance,search,dateFrom,dateTo,searchVal]);
 
   // Apply balance changes to accounts
   const applyBalance = useCallback((catFinal, val, tipo, contaOrigem, contaDestino) => {
@@ -628,8 +630,13 @@ export default function App(){
     {id:"dashboard",label:"Início",icon:"◈"},
     {id:"orcamento",label:"Orçamento",icon:"◉"},
     {id:"transacoes",label:"Movimentos",icon:"≡"},
-    {id:"categorizar",label:`Categorizar${pend.length?` (${pend.length})`:""}`,icon:"◎"},
     {id:"importar",label:"Importar",icon:"↑"},
+    {id:"contas",label:"Contas",icon:"◇"},
+    {id:"config",label:"Configurações",icon:"⚙"},
+  ];
+  const configSubTabs=[
+    {id:"categorizar",label:`Categorizar${pend.length?` (${pend.length})`:""}`,icon:"◎"},
+    {id:"categorias",label:"Categorias",icon:"⊞"},
   ];
 
   // ── LANDING ───────────────────────────────────────────────
@@ -1286,10 +1293,19 @@ export default function App(){
               <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{flex:1,fontSize:12,padding:"5px 6px"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
               <select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{width:62,fontSize:12,padding:"5px 6px"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
             </div>
-            {[...navItems,{id:"contas",label:"Contas",icon:"◇"},{id:"categorias",label:"Categorias",icon:"⊞"}].map(n=>(
-              <button key={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 16px",fontSize:13,fontWeight:tab===n.id?600:400,color:tab===n.id?"#fff":"#64748b",background:tab===n.id?"rgba(59,130,246,0.12)":"transparent",borderLeft:tab===n.id?"3px solid #3b82f6":"3px solid transparent",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
-                <span style={{fontFamily:"monospace",fontSize:12}}>{n.icon}</span><span>{n.label}</span>
-              </button>
+            {navItems.map(n=>(
+              <div key={n.id}>
+                <button onClick={()=>setTab(n.id==="config"?"categorizar":n.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 16px",fontSize:13,fontWeight:(tab===n.id||( n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?600:400,color:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"#fff":"#64748b",background:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"rgba(59,130,246,0.12)":"transparent",borderLeft:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"3px solid #3b82f6":"3px solid transparent",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
+                  <span style={{fontFamily:"monospace",fontSize:12}}>{n.icon}</span><span>{n.label}</span>
+                  {n.id==="config"&&pend.length>0&&<span style={{marginLeft:"auto",fontSize:10,background:"rgba(239,68,68,0.2)",color:"#ef4444",borderRadius:10,padding:"1px 6px"}}>{pend.length}</span>}
+                </button>
+                {/* Config sub-items */}
+                {n.id==="config"&&configSubTabs.some(s=>s.id===tab)&&configSubTabs.map(s=>(
+                  <button key={s.id} onClick={()=>setTab(s.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 16px 7px 32px",fontSize:12,fontWeight:tab===s.id?600:400,color:tab===s.id?"#3b82f6":"#64748b",background:tab===s.id?"rgba(59,130,246,0.08)":"transparent",borderLeft:"none",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
+                    <span style={{fontFamily:"monospace",fontSize:11}}>{s.icon}</span><span>{s.label}</span>
+                  </button>
+                ))}
+              </div>
             ))}
             <div style={{marginTop:"auto",padding:"12px 16px",borderTop:"1px solid #1e3048"}}>
               {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:"#64748b"},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:"#64748b"};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
@@ -1420,25 +1436,63 @@ export default function App(){
           {/* ORÇAMENTO */}
           {tab==="orcamento"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Orçamento</p><p style={{fontSize:12,color:"#64748b",marginBottom:14}}>{MESES[fMes]} {fAno}</p></>}
-              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
-                <Btn variant={orcEdit?"primary":"ghost"} onClick={()=>setOrcEdit(!orcEdit)} style={{fontSize:12,padding:"7px 14px"}}>{orcEdit?"Fechar":"Editar valores"}</Btn>
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Orçamento</p><p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{MESES[fMes]} {fAno}</p></>}
+
+              {/* Controls: copy from previous month + edit */}
+              <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                <Btn variant={orcEdit?"primary":"ghost"} onClick={()=>setOrcEdit(!orcEdit)} style={{fontSize:12,padding:"7px 14px"}}>{orcEdit?"Fechar edição":"Editar orçamento"}</Btn>
+                {orcEdit&&(()=>{
+                  const prevMes=fMes===0?11:fMes-1;
+                  const prevAno=fMes===0?fAno-1:fAno;
+                  const prevKey=`${prevAno}-${String(prevMes+1).padStart(2,"0")}`;
+                  const prevOrc=orcs[prevKey];
+                  return prevOrc&&Object.keys(prevOrc).length>0?(
+                    <Btn variant="ghost" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>{
+                      if(confirm(`Copiar orçamento de ${MESES[prevMes]} ${prevAno} para este mês?`))
+                        setOrcs(prev=>({...prev,[mesKey]:{...prevOrc}}));
+                    }}>📋 Copiar de {MESES[prevMes]}</Btn>
+                  ):null;
+                })()}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                {[{label:"Orçamentado",val:totalOrçamentado,color:"#3b82f6"},{label:"Gasto",val:totD,color:totD>totalOrçamentado?"#ef4444":"#e2e8f0"},{label:"Disponível",val:Math.max(0,totalOrçamentado-totD),color:"#22c55e"}].map(k=>(
+
+              {/* KPIs */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
+                {[
+                  {label:"Orçamentado",val:totalOrçamentado,color:"#3b82f6"},
+                  {label:"Gasto",val:totD,color:totD>totalOrçamentado?"#ef4444":"#e2e8f0"},
+                  {label:"Receitas",val:totR,color:"#22c55e"},
+                  {label:"Disponível",val:Math.max(0,totalOrçamentado-totD),color:totD>totalOrçamentado?"#ef4444":"#22c55e"},
+                ].map(k=>(
                   <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"10px 12px"}}>
                     <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
                     <p style={{fontSize:15,fontWeight:600,color:k.color}}>{fE0(k.val)}</p>
                   </div>
                 ))}
               </div>
+
+              {/* Receitas detail */}
+              {rec.length>0&&(
+                <Card style={{marginBottom:12,background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.2)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <p style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>💵 Receitas</p>
+                    <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE0(totR)}</span>
+                  </div>
+                  {Object.entries(catData["Receita"]?.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
+                    <div key={sub} style={{display:"flex",justifyContent:"space-between",padding:"3px 0 3px 8px",borderTop:"1px solid rgba(34,197,94,0.1)"}}>
+                      <span style={{fontSize:12,color:"#64748b"}}>{sub||"Outros"}</span>
+                      <span style={{fontSize:12,color:"#22c55e",fontWeight:500}}>{fE0(val)}</span>
+                    </div>
+                  ))}
+                </Card>
+              )}
+
+              {/* Despesas por categoria */}
               <Card>
                 {Object.keys(cats).filter(c=>!["Transferência Interna","Receita","Poupança"].includes(c)).map(cat=>{
                   const cfg=cats[cat],orc=orcMes[cat]||0,d=catData[cat]||{out:0,in:0,subs:{}};
                   const net=NET_CATS.has(cat)?d.out-d.in:d.out,over=net>orc&&orc>0;
                   return(
                     <div key={cat} style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid #1e3048"}}>
-                      {/* Category header — clickable */}
                       <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:4}} onClick={()=>setCatModal(cat)}>
                         <span style={{fontSize:16,width:22,flexShrink:0}}>{cfg.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,flex:1}}>{cat}</span>
@@ -1451,13 +1505,36 @@ export default function App(){
                         ):<span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>/{fE0(orc)}</span>}
                       </div>
                       {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":"#64748b"}}>{over?`+${fE0(net-orc)} acima`:`${fE0(orc-net)} livre`}</span></div></>})()}
-                      {/* Subcategories */}
-                      {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
-                        <div key={sub} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 30px",marginTop:3}}>
-                          <span style={{fontSize:11,color:"#64748b"}}>{sub||"Sem subcategoria"}</span>
-                          <span style={{fontSize:11,color:"#94a3b8"}}>{fE0(val)}</span>
+                      {/* Subcategories with orçamento detail */}
+                      {(Object.entries(d.subs||{}).filter(([,v])=>v>0).length>0||orcEdit)&&(
+                        <div style={{marginTop:4}}>
+                          {/* Real spending per sub */}
+                          {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
+                            <div key={sub} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0 3px 30px"}}>
+                              <span style={{fontSize:11,color:"#64748b"}}>{sub||"Sem subcategoria"}</span>
+                              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                                <span style={{fontSize:11,color:"#94a3b8"}}>{fE0(val)}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Sub-budget inputs when editing */}
+                          {orcEdit&&(cats[cat]?.subs||[]).map(sub=>{
+                            const subOrcKey=`${cat}::${sub}`;
+                            const subOrc=orcMes[subOrcKey]||0;
+                            return(
+                              <div key={sub} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0 3px 30px"}}>
+                                <span style={{fontSize:11,color:"#64748b"}}>{sub}</span>
+                                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                  <span style={{fontSize:10,color:"#64748b"}}>orç.</span>
+                                  <input type="number" defaultValue={subOrc||""} placeholder="0"
+                                    style={{width:65,textAlign:"right",padding:"2px 6px",fontSize:11}}
+                                    onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[subOrcKey]:v}}));}}/>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
+                      )}
                     </div>
                   );
                 })}
@@ -1533,12 +1610,13 @@ export default function App(){
 
               {/* Filters */}
               <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-                <input placeholder="🔍 Pesquisar por descrição, entidade ou categoria..." value={search} onChange={e=>setSearch(e.target.value)} style={{fontSize:13}}/>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <input placeholder="🔍 Pesquisar por descrição, entidade, categoria..." value={search} onChange={e=>setSearch(e.target.value)} style={{fontSize:13}}/>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div><Lbl>De</Lbl><input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/></div>
                   <div><Lbl>Até</Lbl><input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/></div>
+                  <div><Lbl>Valor (€)</Lbl><input type="number" value={searchVal} placeholder="ex: 23.50" step="0.01" onChange={e=>setSearchVal(e.target.value)} style={{fontSize:13}}/></div>
                 </div>
-                {(search||dateFrom||dateTo)&&<button onClick={()=>{setSearch("");setDateFrom("");setDateTo("");}} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"6px",fontSize:12,borderRadius:8}}>✕ Limpar filtros</button>}
+                {(search||dateFrom||dateTo||searchVal)&&<button onClick={()=>{setSearch("");setDateFrom("");setDateTo("");setSearchVal("");}} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"6px",fontSize:12,borderRadius:8}}>✕ Limpar filtros</button>}
               </div>
               {!filteredTrans.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Sem transações.</p></Card>}
               {filteredTrans.map(t=>(
@@ -1799,9 +1877,10 @@ export default function App(){
         {/* Mobile tab bar */}
         {isMobile&&(
           <div className="tabbar">
-            <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
-            {navItems.map(n=><button key={n.id} className={tab===n.id?"act":""} onClick={()=>setTab(n.id)}><span style={{fontSize:18}}>{n.icon}</span>{n.label}</button>)}
+            <button onClick={()=>setScreen("landing")} style={{fontSize:10,color:"#64748b",flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none"}}><span style={{fontSize:18}}>🏠</span>Hub</button>
+            {navItems.filter(n=>!["contas","config"].includes(n.id)).map(n=><button key={n.id} className={tab===n.id?"act":""} onClick={()=>setTab(n.id==="config"?"categorizar":n.id)}><span style={{fontSize:18}}>{n.icon}</span>{n.label}</button>)}
             <button className={tab==="contas"?"act":""} onClick={()=>setTab("contas")}><span style={{fontSize:18}}>◇</span>Contas</button>
+            <button className={(tab==="categorizar"||tab==="categorias")?"act":""} onClick={()=>setTab("categorizar")}><span style={{fontSize:18}}>⚙</span>Config</button>
           </div>
         )}
       </div>
