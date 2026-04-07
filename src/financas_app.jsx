@@ -216,10 +216,9 @@ function parseLines(text, cats) {
 }
 
 const CONTA_SECOES = [
-  { id:"corrente", label:"Contas Correntes", icon:"🏦" },
-  { id:"caixinha", label:"Apparte — Caixinhas", icon:"🏺" },
-  { id:"poupanca", label:"Poupança", icon:"💰" },
-  { id:"investimento", label:"Investimento", icon:"📈" },
+  { id:"corrente",    label:"Contas Correntes",     icon:"🏦" },
+  { id:"caixinha",    label:"Apparte — Caixinhas",  icon:"🏺" },
+  { id:"investimento",label:"Investimento",          icon:"📈" },
 ];
 
 const DEF_CONTAS=[
@@ -238,8 +237,7 @@ const DEF_CONTAS=[
   {id:"cx_sau", nome:"Saúde",           tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#ef4444", icon:"🏥"},
   {id:"cx_pre", nome:"Prendas",         tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#a855f7", icon:"🎁"},
   {id:"cx_dep", nome:"Despesas Mensais",tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#f59e0b", icon:"📋"},
-  // Poupança
-  {id:"cx_sau2",nome:"Saúde",           tipo:"poupança",    secao:"poupanca",    saldo:0,    cor:"#ef4444", icon:"💊"},
+  // Poupança (vazia por agora)
   // Investimento
   {id:"opt_ana",nome:"Optimize Ana",    tipo:"investimento",secao:"investimento",saldo:0,    cor:"#06b6d4", icon:"📊"},
   {id:"opt_joa",nome:"Optimize João",   tipo:"investimento",secao:"investimento",saldo:0,    cor:"#0284c7", icon:"📊"},
@@ -1707,7 +1705,10 @@ export default function App(){
           {/* CONTAS */}
           {tab==="contas"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:14}}>Atualiza os saldos</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:10}}>Atualiza os saldos</p></>}
+              <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:14}}>
+                ＋ Adicionar movimento manual
+              </button>
               {contas.map(c=>(
                 <div key={c.id} style={{background:"#0d1a2e",border:`1px solid ${c.cor}44`,borderRadius:14,padding:16,marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -1791,6 +1792,7 @@ export default function App(){
           <div className="tabbar">
             <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
             {navItems.map(n=><button key={n.id} className={tab===n.id?"act":""} onClick={()=>setTab(n.id)}><span style={{fontSize:18}}>{n.icon}</span>{n.label}</button>)}
+            <button className={tab==="contas"?"act":""} onClick={()=>setTab("contas")}><span style={{fontSize:18}}>◇</span>Contas</button>
           </div>
         )}
       </div>
