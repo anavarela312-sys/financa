@@ -215,13 +215,38 @@ function parseLines(text, cats) {
   return out.sort((a,b)=>b.data.localeCompare(a.data));
 }
 
+const CONTA_SECOES = [
+  { id:"corrente", label:"Contas Correntes", icon:"🏦" },
+  { id:"caixinha", label:"Apparte — Caixinhas", icon:"🏺" },
+  { id:"poupanca", label:"Poupança", icon:"💰" },
+  { id:"investimento", label:"Investimento", icon:"📈" },
+];
+
 const DEF_CONTAS=[
-  {id:"mill",nome:"Millennium",tipo:"corrente",saldo:0,cor:"#3b82f6",icon:"🏦"},
-  {id:"app",nome:"Apparte",tipo:"poupança",saldo:1350,cor:"#22c55e",icon:"💰"},
-  {id:"opt",nome:"Optimize",tipo:"poupança",saldo:0,cor:"#06b6d4",icon:"📊"},
-  {id:"xtb",nome:"XTB",tipo:"investimento",saldo:1400,cor:"#f59e0b",icon:"📈"},
-  {id:"cart",nome:"Carteira",tipo:"dinheiro",saldo:0,cor:"#78716c",icon:"👛"},
-  {id:"lexc",nome:"Conta Lexie",tipo:"poupança",saldo:0,cor:"#ec4899",icon:"👧"},
+  // Correntes
+  {id:"mill",  nome:"Millennium",       tipo:"corrente",    secao:"corrente",    saldo:0,    cor:"#3b82f6", icon:"🏦"},
+  {id:"cart",  nome:"Carteira",         tipo:"corrente",    secao:"corrente",    saldo:0,    cor:"#78716c", icon:"👛"},
+  {id:"ref_ana",nome:"Refeição Ana",    tipo:"corrente",    secao:"corrente",    saldo:0,    cor:"#6366f1", icon:"🍽️"},
+  {id:"ref_joa",nome:"Refeição João",   tipo:"corrente",    secao:"corrente",    saldo:0,    cor:"#8b5cf6", icon:"🍽️"},
+  // Caixinhas Apparte
+  {id:"cx_meal",nome:"Mealheiro",       tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#22c55e", icon:"🏺"},
+  {id:"cx_fer", nome:"Férias",          tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#10b981", icon:"✈️"},
+  {id:"cx_vet", nome:"Veterinário",     tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#84cc16", icon:"🐾"},
+  {id:"cx_cas", nome:"Casa",            tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#14b8a6", icon:"🏠"},
+  {id:"cx_edu", nome:"Educação",        tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#06b6d4", icon:"📚"},
+  {id:"cx_lex", nome:"Lexie",           tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#ec4899", icon:"👧"},
+  {id:"cx_sau", nome:"Saúde",           tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#ef4444", icon:"🏥"},
+  {id:"cx_pre", nome:"Prendas",         tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#a855f7", icon:"🎁"},
+  {id:"cx_dep", nome:"Despesas Mensais",tipo:"caixinha",    secao:"caixinha",    saldo:0,    cor:"#f59e0b", icon:"📋"},
+  // Poupança
+  {id:"cx_sau2",nome:"Saúde",           tipo:"poupança",    secao:"poupanca",    saldo:0,    cor:"#ef4444", icon:"💊"},
+  // Investimento
+  {id:"opt_ana",nome:"Optimize Ana",    tipo:"investimento",secao:"investimento",saldo:0,    cor:"#06b6d4", icon:"📊"},
+  {id:"opt_joa",nome:"Optimize João",   tipo:"investimento",secao:"investimento",saldo:0,    cor:"#0284c7", icon:"📊"},
+  {id:"sag_ana",nome:"Save & Grow Ana", tipo:"investimento",secao:"investimento",saldo:0,    cor:"#10b981", icon:"🌱"},
+  {id:"sag_joa",nome:"Save & Grow João",tipo:"investimento",secao:"investimento",saldo:0,    cor:"#059669", icon:"🌱"},
+  {id:"ppr_lex",nome:"PPR Alves Ribeiro — Lexie",tipo:"investimento",secao:"investimento",saldo:0,cor:"#ec4899",icon:"👧"},
+  {id:"xtb",   nome:"XTB",             tipo:"investimento",secao:"investimento",saldo:1400, cor:"#f59e0b", icon:"📈"},
 ];
 const DEF_ORC={"2026-04":{"Casa":1826,"Saúde":626,"Créditos":310,"Animais":161,"Alimentação":185,"Mensalidades":57,"Mina Santos":87,"Educação":112,"Lazer":75,"Lexie":51,"Prendas":31,"Carro":100,"Vários / Extras":100,"Investimento":100,"Donativos":11,"Despesas bancárias":10}};
 const DEF_SNAPS=[{label:"Mar 2026",year:2026,month:2,planned:1000,actual:1000,note:"Início"},{label:"Abr 2026",year:2026,month:3,planned:1800,actual:1350,note:"Imprevistos"}];
@@ -334,6 +359,8 @@ export default function App(){
   const [simExtra,setSimExtra]=useState(0);
   const [newSnap,setNewSnap]=useState("");
   const [dismissedAlerts,setDismissedAlerts]=useState(new Set());
+  const [addManual,setAddManual]=useState(false);
+  const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
   const [search,setSearch]=useState("");
   const [dateFrom,setDateFrom]=useState("");
   const [dateTo,setDateTo]=useState("");
@@ -448,9 +475,31 @@ export default function App(){
     });
   },[transMesWithBalance,search,dateFrom,dateTo]);
 
+  // Apply balance changes to accounts
+  const applyBalance = useCallback((catFinal, val, tipo, contaOrigem, contaDestino) => {
+    if (catFinal==="Transferência Interna"||catFinal==="Poupança") {
+      if (contaOrigem && contaDestino) {
+        setContas(prev=>prev.map(c=>{
+          if(c.id===contaOrigem) return{...c,saldo:c.saldo-val};
+          if(c.id===contaDestino) return{...c,saldo:c.saldo+val};
+          return c;
+        }));
+      }
+    } else if (catFinal==="Receita") {
+      if (contaDestino) setContas(prev=>prev.map(c=>c.id===contaDestino?{...c,saldo:c.saldo+val}:c));
+    } else {
+      // Regular expense/income — only if not Millennium (auto-calculated)
+      if (contaOrigem && contaOrigem!=="mill") {
+        setContas(prev=>prev.map(c=>{
+          if(c.id===contaOrigem) return{...c,saldo:tipo==="d"?c.saldo-val:c.saldo+val};
+          return c;
+        }));
+      }
+    }
+  }, [setContas]);
+
   const confirmP=id=>{
     const ed=pEd[id]||{},t=pend.find(p=>p.id===id);if(!t)return;
-    // Use edited values OR original auto-detected values
     const catFinal=ed.cat!==undefined?ed.cat:t.cat;
     const subFinal=ed.sub!==undefined?ed.sub:t.sub;
     const entFinal=ed.ent!==undefined?ed.ent:t.ent;
@@ -458,18 +507,7 @@ export default function App(){
     if(catFinal&&ed.newSubName&&cats[catFinal]){const c={...cats};c[catFinal]={...c[catFinal],subs:[...c[catFinal].subs,ed.newSubName]};setCats(c);}
     const finalTrans={...t,cat:catFinal,sub:subFinal,ent:entFinal,data:ed.data||t.data,nota:ed.nota||t.nota||"",ok:true,contaOrigem:ed.contaOrigem||"",contaDestino:ed.contaDestino||""};
     setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return ids.has(finalTrans.desc+finalTrans.data+finalTrans.val)?prev:[...prev,finalTrans];});
-    // Update account balances if transfer between accounts
-    if(ed.contaOrigem&&ed.contaDestino){
-      setContas(prev=>prev.map(c=>{
-        if(c.id===ed.contaOrigem) return{...c,saldo:Math.max(0,c.saldo-t.val)};
-        if(c.id===ed.contaDestino) return{...c,saldo:c.saldo+t.val};
-        return c;
-      }));
-    } else if(catFinal==="Receita"&&ed.contaDestino){
-      setContas(prev=>prev.map(c=>c.id===ed.contaDestino?{...c,saldo:c.saldo+t.val}:c));
-    } else if(catFinal!=="Transferência Interna"&&catFinal!=="Receita"&&ed.contaOrigem){
-      setContas(prev=>prev.map(c=>c.id===ed.contaOrigem?{...c,saldo:Math.max(0,c.saldo-t.val)}:c));
-    }
+    applyBalance(catFinal, t.val, t.tipo, ed.contaOrigem, ed.contaDestino);
     const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");
   };
 
@@ -734,13 +772,29 @@ export default function App(){
               <Card>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Contas</p><button onClick={()=>setTab("contas")} style={{background:"none",border:"none",color:"#3b82f6",fontSize:12,cursor:"pointer"}}>Gerir →</button></div>
                 <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
-                  {contas.map(c=>(
-                    <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"10px 12px",flexShrink:0,minWidth:95}}>
-                      <p style={{fontSize:15,marginBottom:3}}>{c.icon}</p>
-                      <p style={{fontSize:10,color:"#64748b",marginBottom:2,whiteSpace:"nowrap"}}>{c.nome}</p>
-                      <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE0(c.saldo)}</p>
-                    </div>
-                  ))}
+                  {CONTA_SECOES.map(sec=>{
+                    const secContas=contas.filter(c=>c.secao===sec.id);
+                    if(!secContas.length) return null;
+                    const secTotal=secContas.reduce((a,c)=>a+c.saldo,0);
+                    return(
+                      <div key={sec.id} style={{flexShrink:0}}>
+                        <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6,paddingLeft:2}}>{sec.icon} {sec.label}</p>
+                        <div style={{display:"flex",gap:6}}>
+                          {secContas.map(c=>(
+                            <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 10px",minWidth:85}}>
+                              <p style={{fontSize:14,marginBottom:2}}>{c.icon}</p>
+                              <p style={{fontSize:10,color:"#64748b",marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:80}}>{c.nome}</p>
+                              <p style={{fontSize:12,fontWeight:600,color:"#fff"}}>{fE0(c.saldo)}</p>
+                            </div>
+                          ))}
+                          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #1e3048",borderRadius:10,padding:"8px 10px",minWidth:70,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+                            <p style={{fontSize:9,color:"#64748b",marginBottom:1}}>Total</p>
+                            <p style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>{fE0(secTotal)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
 
@@ -826,6 +880,68 @@ export default function App(){
           {tab==="transacoes"&&(
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Transações</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>{transMes.length} movimentos · {MESES[fMes]} {fAno}</p></>}
+
+              {/* Add manual transaction */}
+              <div style={{marginBottom:12}}>
+                <button onClick={()=>setAddManual(!addManual)} style={{background:addManual?"rgba(59,130,246,0.2)":"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.3)",borderRadius:10,padding:"9px 16px",fontSize:13,width:"100%",marginBottom:addManual?10:0}}>
+                  {addManual?"✕ Fechar":"＋ Adicionar movimento manual"}
+                </button>
+                {addManual&&(
+                  <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:16}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                      <div><Lbl>Data</Lbl><input type="date" value={manualT.data} onChange={e=>setManualT(t=>({...t,data:e.target.value}))}/></div>
+                      <div><Lbl>Tipo</Lbl>
+                        <select value={manualT.tipo} onChange={e=>setManualT(t=>({...t,tipo:e.target.value}))}>
+                          <option value="d">💸 Débito / Saída</option>
+                          <option value="c">💰 Crédito / Entrada</option>
+                        </select>
+                      </div>
+                      <div><Lbl>Descrição</Lbl><input type="text" value={manualT.desc} placeholder="Ex: Supermercado" onChange={e=>setManualT(t=>({...t,desc:e.target.value}))}/></div>
+                      <div><Lbl>Entidade</Lbl><input type="text" value={manualT.ent} placeholder="Ex: Continente" onChange={e=>setManualT(t=>({...t,ent:e.target.value}))}/></div>
+                      <div><Lbl>Valor (€)</Lbl><input type="number" value={manualT.val} placeholder="0.00" step="0.01" onChange={e=>setManualT(t=>({...t,val:e.target.value}))}/></div>
+                      <div><Lbl>Categoria</Lbl>
+                        <select value={manualT.cat} onChange={e=>setManualT(t=>({...t,cat:e.target.value,sub:""}))}>
+                          <option value="">Selecionar...</option>
+                          {Object.keys(cats).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
+                        </select>
+                      </div>
+                      <div><Lbl>Subcategoria</Lbl>
+                        <select value={manualT.sub} onChange={e=>setManualT(t=>({...t,sub:e.target.value}))}>
+                          <option value="">—</option>
+                          {(cats[manualT.cat]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div><Lbl>Conta {manualT.tipo==="d"?"(débito de)":"(crédito em)"}</Lbl>
+                        <select value={manualT.contaOrigem} onChange={e=>setManualT(t=>({...t,contaOrigem:e.target.value}))}>
+                          <option value="">— sem conta —</option>
+                          {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}
+                        </select>
+                      </div>
+                      {(manualT.cat==="Transferência Interna"||manualT.cat==="Poupança")&&(
+                        <div><Lbl>Conta destino</Lbl>
+                          <select value={manualT.contaDestino} onChange={e=>setManualT(t=>({...t,contaDestino:e.target.value}))}>
+                            <option value="">— sem conta —</option>
+                            {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      <div style={{gridColumn:"1/-1"}}><Lbl>Nota</Lbl><input type="text" value={manualT.nota} placeholder="Opcional..." onChange={e=>setManualT(t=>({...t,nota:e.target.value}))}/></div>
+                    </div>
+                    <button onClick={()=>{
+                      const val=parseFloat(manualT.val);
+                      if(!val||!manualT.desc){alert("Preenche pelo menos a descrição e o valor.");return;}
+                      const t={id:crypto.randomUUID(),data:manualT.data,dataOrig:manualT.data,desc:manualT.desc,val:Math.abs(val),tipo:manualT.tipo,cat:manualT.cat,sub:manualT.sub,ent:manualT.ent||manualT.desc,nota:manualT.nota,ok:true,contaOrigem:manualT.contaOrigem,contaDestino:manualT.contaDestino};
+                      setTrans(prev=>[...prev,t]);
+                      applyBalance(manualT.cat,Math.abs(val),manualT.tipo,manualT.contaOrigem,manualT.contaDestino);
+                      setManualT({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
+                      setAddManual(false);
+                    }} style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontSize:14,width:"100%",fontWeight:600}}>
+                      ＋ Adicionar movimento
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Filters */}
               <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
                 <input placeholder="🔍 Pesquisar por descrição, entidade ou categoria..." value={search} onChange={e=>setSearch(e.target.value)} style={{fontSize:13}}/>
@@ -967,24 +1083,24 @@ export default function App(){
                                 </select>
                               </div>
                             </>}
-                            {(catA==="Transferência Interna"||catA==="Receita"||catA==="Poupança")&&(
+                            {/* Conta fields — always show */}
+                          {(catA==="Transferência Interna"||catA==="Poupança")?(
                             <div style={{gridColumn:"1/-1",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                              <div><Lbl>Conta origem</Lbl>
+                              <div><Lbl>Conta origem (débito)</Lbl>
                                 <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
-                                  <option value="">— nenhuma —</option>
+                                  <option value="">— selecionar —</option>
                                   {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
                                 </select>
                               </div>
-                              <div><Lbl>Conta destino</Lbl>
+                              <div><Lbl>Conta destino (crédito)</Lbl>
                                 <select value={ed.contaDestino||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaDestino:e.target.value}}))}>
-                                  <option value="">— nenhuma —</option>
+                                  <option value="">— selecionar —</option>
                                   {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
                                 </select>
                               </div>
                             </div>
-                          )}
-                          {catA&&catA!=="Transferência Interna"&&catA!=="Receita"&&catA!=="Poupança"&&(
-                            <div style={{gridColumn:"1/-1"}}><Lbl>Conta (débito de)</Lbl>
+                          ):(
+                            <div style={{gridColumn:"1/-1"}}><Lbl>{t.tipo==="d"?"Conta (débito de)":"Conta (crédito em)"}</Lbl>
                               <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
                                 <option value="">— não actualizar saldo —</option>
                                 {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
