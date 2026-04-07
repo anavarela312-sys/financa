@@ -250,6 +250,47 @@ const DEF_CONTAS=[
 ];
 const DEF_ORC={"2026-04":{"Casa":1826,"Saúde":626,"Créditos":310,"Animais":161,"Alimentação":185,"Mensalidades":57,"Mina Santos":87,"Educação":112,"Lazer":75,"Lexie":51,"Prendas":31,"Carro":100,"Vários / Extras":100,"Investimento":100,"Donativos":11,"Despesas bancárias":10}};
 const DEF_SNAPS=[{label:"Mar 2026",year:2026,month:2,planned:1000,actual:1000,note:"Início"},{label:"Abr 2026",year:2026,month:3,planned:1800,actual:1350,note:"Imprevistos"}];
+
+// ── PATRIMONIO ────────────────────────────────────────────────
+const PATRIMONIO_ATIVOS = [
+  // Imobiliário
+  { id:"casa",     label:"Casa Própria",          grupo:"imovel",      icon:"🏠", color:"#3b82f6", fixo:true },
+  { id:"imovel2",  label:"Investimento Imobiliário",grupo:"imovel",    icon:"🏗️", color:"#6366f1", fixo:false },
+  // PPR / Investimentos
+  { id:"ppr_lex",  label:"PPR Alves Ribeiro — Lexie",grupo:"investimento",icon:"👧",color:"#ec4899" },
+  { id:"ppr_opt_ana",label:"PPR Optimize Ana",    grupo:"investimento",icon:"📊", color:"#06b6d4" },
+  { id:"ppr_opt_joa",label:"PPR Optimize João",   grupo:"investimento",icon:"📊", color:"#0284c7" },
+  { id:"ppr_grow_ana",label:"PPR Grow Ana",        grupo:"investimento",icon:"🌱", color:"#10b981" },
+  { id:"ppr_grow_joa",label:"PPR Grow João",       grupo:"investimento",icon:"🌱", color:"#059669" },
+  { id:"xtb",      label:"Investimento em Bolsa (XTB)",grupo:"investimento",icon:"📈",color:"#f59e0b" },
+  // Liquidez
+  { id:"aforro",   label:"Conta Aforro",           grupo:"liquidez",   icon:"🏦", color:"#64748b" },
+  { id:"apparte_total",label:"Apparte (total)",    grupo:"liquidez",   icon:"💰", color:"#22c55e" },
+];
+
+const PATRIMONIO_PASSIVOS = [
+  { id:"cred_hab",  label:"Crédito Habitação",     icon:"🏠", color:"#ef4444" },
+  { id:"cred_pes",  label:"Crédito Pessoal Millennium", icon:"💳", color:"#f43f5e" },
+];
+
+const EMPRESA_ITEMS = [
+  { id:"emp_dp",    label:"Depósito a Prazo",       icon:"🏦", color:"#f59e0b" },
+  { id:"emp_outro", label:"Outros",                 icon:"📦", color:"#64748b" },
+];
+
+const DEF_PAT_SNAPSHOT = {
+  mes: new Date().toISOString().slice(0,7),
+  ativos: {},    // id -> { valor, investido }
+  passivos: {},  // id -> valor
+  empresa: {},   // id -> valor
+};
+
+const GRUPOS_ATIVOS = [
+  { id:"imovel",       label:"Imobiliário",   icon:"🏠", color:"#3b82f6" },
+  { id:"investimento", label:"Investimentos", icon:"📈", color:"#f59e0b" },
+  { id:"liquidez",     label:"Liquidez",      icon:"💰", color:"#22c55e" },
+];
+
 const PLAN_LEVELS=[{id:1,name:"Fundo 3 Meses",target:10500,color:"#22c55e",desc:"Rede mínima"},{id:2,name:"Limpar Crédito",target:16000,color:"#f59e0b",desc:"Dívida eliminada"},{id:3,name:"Fundo 6 Meses",target:21000,color:"#06b6d4",desc:"Rede robusta"},{id:4,name:"Investimento",target:1050000,color:"#8b5cf6",desc:"Independência"}];
 
 const fE=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2});
@@ -337,17 +378,17 @@ export default function App(){
 
   const [cats,setCats,forceCats]=useLS("fin_cats_v6",DEFAULT_CATS);
 
-  const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats}),[trans,pend,contas,orcs,snaps,cats]);
+  const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats,patSnaps}),[trans,pend,contas,orcs,snaps,cats,patSnaps]);
   const handleDriveLoad=useCallback(json=>{
     if(!json) return;
-    // Use forceSet to overwrite localStorage with Drive data
     if(json.trans?.length>0) forceTrans(json.trans);
     if(json.pend?.length>0) forcePend(json.pend);
     if(json.contas?.length>0) forceContas(json.contas);
     if(json.orcs && Object.keys(json.orcs).length>0) forceOrcs(json.orcs);
     if(json.snaps?.length>0) forceSnaps(json.snaps);
     if(json.cats && Object.keys(json.cats).length>0) forceCats(json.cats);
-  },[forceTrans,forcePend,forceContas,forceOrcs,forceSnaps,forceCats]);
+    if(json.patSnaps?.length>0) setPatSnaps(json.patSnaps);
+  },[forceTrans,forcePend,forceContas,forceOrcs,forceSnaps,forceCats,setPatSnaps]);
   const {status:driveStatus}=useJSONBinSync(allData,handleDriveLoad);
 
 
@@ -358,6 +399,9 @@ export default function App(){
   const [importMsg,setImportMsg]=useState("");
   const [simExtra,setSimExtra]=useState(0);
   const [newSnap,setNewSnap]=useState("");
+  const [patSnaps,setPatSnaps]=useLS("fin_pat_v1",[]);
+  const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
+  const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
   const [dismissedAlerts,setDismissedAlerts]=useState(new Set());
   const [addManual,setAddManual]=useState(false);
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
@@ -606,6 +650,242 @@ export default function App(){
             <label style={{flex:1,padding:"10px",background:"rgba(255,255,255,0.04)",color:"#94a3b8",border:"1px solid #1e3048",borderRadius:10,fontSize:12,cursor:"pointer",textAlign:"center",display:"block"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
           </div>
         </div>
+      </div>
+    </>
+  );
+
+  // ── PATRIMONIO ───────────────────────────────────────────────
+  if(screen==="patrimonio") return (
+    <>
+      <style>{CSS}</style>
+      <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
+        <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
+          <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
+          <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>💎 Património Líquido</p>
+        </div>
+
+        <div style={{padding:mainPad,maxWidth:isMobile?undefined:960,margin:"0 auto"}} className="fade">
+
+          {/* Summary KPIs — latest snapshot */}
+          {(()=>{
+            const latest = patSnaps[patSnaps.length-1];
+            const prev = patSnaps[patSnaps.length-2];
+            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Regista o primeiro mês abaixo.</p></Card>;
+            const totalAtivos = Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+            const totalPassivos = Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
+            const patLiq = totalAtivos - totalPassivos;
+            const prevPat = prev ? Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0) - Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0) : null;
+            const diff = prevPat!==null ? patLiq-prevPat : null;
+            const pct = prevPat ? ((patLiq-prevPat)/Math.abs(prevPat)*100) : null;
+            return(
+              <div style={{marginBottom:16}}>
+                <p style={{fontSize:13,color:"#64748b",marginBottom:10}}>{latest.mes} · último registo</p>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:10}}>
+                  {[
+                    {label:"Total Ativos",val:totalAtivos,color:"#22c55e"},
+                    {label:"Total Passivos",val:totalPassivos,color:"#ef4444"},
+                    {label:"Património Líquido",val:patLiq,color:"#3b82f6"},
+                    {label:"Variação vs mês ant.",val:diff,color:diff>=0?"#22c55e":"#ef4444",isPct:true,pct},
+                  ].map(k=>(
+                    <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
+                      <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
+                      {k.val!==null
+                        ? <p style={{fontSize:18,fontWeight:700,color:k.color}}>{k.val>=0?"+":""}{fE0(k.val)}</p>
+                        : <p style={{fontSize:14,color:"#64748b"}}>—</p>}
+                      {k.isPct&&k.pct!==null&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Historical evolution */}
+          {patSnaps.length>1&&(
+            <Card>
+              <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução mensal</p>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:500}}>
+                  <thead>
+                    <tr style={{borderBottom:"1px solid #1e3048"}}>
+                      {["Mês","Ativos","Passivos","Património Líquido","Variação","Variação %"].map(h=>(
+                        <th key={h} style={{textAlign:"left",padding:"6px 10px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...patSnaps].reverse().map((s,i,arr)=>{
+                      const totalA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+                      const totalP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
+                      const pat=totalA-totalP;
+                      const prevS=arr[i+1];
+                      const prevPat=prevS?Object.values(prevS.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prevS.passivos||{}).reduce((a,v)=>a+v,0):null;
+                      const diff=prevPat!==null?pat-prevPat:null;
+                      const pct=prevPat?((pat-prevPat)/Math.abs(prevPat)*100):null;
+                      return(
+                        <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
+                          <td style={{padding:"10px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
+                          <td style={{padding:"10px",color:"#22c55e"}}>{fE0(totalA)}</td>
+                          <td style={{padding:"10px",color:"#ef4444"}}>{fE0(totalP)}</td>
+                          <td style={{padding:"10px",fontWeight:700,color:"#3b82f6"}}>{fE0(pat)}</td>
+                          <td style={{padding:"10px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE0(diff)}`}</td>
+                          <td style={{padding:"10px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Register / Edit month */}
+          <Card>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Registar mês</p>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
+                  onChange={e=>{
+                    setPatEdit(e.target.value);
+                    const existing=patSnaps.find(s=>s.mes===e.target.value);
+                    if(existing) setPatDraft({ativos:{...existing.ativos},passivos:{...existing.passivos},empresa:{...existing.empresa||{}}});
+                    else setPatDraft({ativos:{},passivos:{},empresa:{}});
+                  }}
+                  style={{fontSize:12,padding:"6px 10px",width:"auto"}}/>
+              </div>
+            </div>
+
+            {/* ATIVOS */}
+            <p style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Ativos</p>
+            {GRUPOS_ATIVOS.map(grupo=>(
+              <div key={grupo.id} style={{marginBottom:14}}>
+                <p style={{fontSize:11,color:"#64748b",marginBottom:8,display:"flex",alignItems:"center",gap:6}}><span>{grupo.icon}</span>{grupo.label}</p>
+                {PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).map(item=>{
+                  const d=patDraft.ativos[item.id]||{valor:"",investido:""};
+                  return(
+                    <div key={item.id} style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(255,255,255,0.02)",borderRadius:10,borderLeft:`3px solid ${item.color}44`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:16}}>{item.icon}</span>
+                        <span style={{fontSize:13,color:"#e2e8f0"}}>{item.label}</span>
+                      </div>
+                      <div>
+                        <Lbl>Valor atual (€)</Lbl>
+                        <input type="number" value={d.valor} placeholder="0"
+                          onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:parseFloat(e.target.value)||""}}}))
+                          } style={{fontSize:13}}/>
+                      </div>
+                      {!item.fixo&&(
+                        <div>
+                          <Lbl>Total investido (€)</Lbl>
+                          <input type="number" value={d.investido} placeholder="0"
+                            onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
+                            style={{fontSize:13}}/>
+                        </div>
+                      )}
+                      {!item.fixo&&d.valor&&d.investido&&(
+                        <div style={{gridColumn:isMobile?"1":"3",display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}>
+                          {(()=>{const ganho=(d.valor||0)-(d.investido||0);const pct=d.investido?ganho/d.investido*100:0;return(
+                            <span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE0(Math.abs(ganho))} ({pct>=0?"+":""}{pct.toFixed(1)}%)</span>
+                          );})()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+
+            {/* PASSIVOS */}
+            <p style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:10,textTransform:"uppercase",letterSpacing:1,marginTop:8}}>Passivos</p>
+            {PATRIMONIO_PASSIVOS.map(item=>{
+              const val=patDraft.passivos[item.id]||"";
+              return(
+                <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(239,68,68,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:16}}>{item.icon}</span>
+                    <span style={{fontSize:13,color:"#e2e8f0"}}>{item.label}</span>
+                  </div>
+                  <div>
+                    <Lbl>Capital em dívida (€)</Lbl>
+                    <input type="number" value={val} placeholder="0"
+                      onChange={e=>setPatDraft(p=>({...p,passivos:{...p.passivos,[item.id]:parseFloat(e.target.value)||""}}))}
+                      style={{fontSize:13}}/>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* EMPRESA */}
+            <p style={{fontSize:12,fontWeight:600,color:"#f59e0b",marginBottom:10,textTransform:"uppercase",letterSpacing:1,marginTop:8}}>Empresa (Linguagem Entusiasta)</p>
+            {EMPRESA_ITEMS.map(item=>{
+              const val=patDraft.empresa[item.id]||"";
+              return(
+                <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(245,158,11,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:16}}>{item.icon}</span>
+                    <span style={{fontSize:13,color:"#e2e8f0"}}>{item.label}</span>
+                  </div>
+                  <div>
+                    <Lbl>Valor (€)</Lbl>
+                    <input type="number" value={val} placeholder="0"
+                      onChange={e=>setPatDraft(p=>({...p,empresa:{...p.empresa,[item.id]:parseFloat(e.target.value)||""}}))}
+                      style={{fontSize:13}}/>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Save button */}
+            <button onClick={()=>{
+              const mes=patEdit||new Date().toISOString().slice(0,7);
+              const snap={mes,ativos:patDraft.ativos,passivos:patDraft.passivos,empresa:patDraft.empresa};
+              setPatSnaps(prev=>{const filtered=prev.filter(s=>s.mes!==mes);return[...filtered,snap].sort((a,b)=>a.mes.localeCompare(b.mes));});
+              setPatDraft({ativos:{},passivos:{},empresa:{}});
+            }} style={{width:"100%",background:"#22c55e",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,marginTop:16,cursor:"pointer"}}>
+              ✓ Guardar {patEdit||new Date().toISOString().slice(0,7)}
+            </button>
+          </Card>
+
+          {/* Investments detail — valor investido vs atual */}
+          {patSnaps.length>0&&(()=>{
+            const latest=patSnaps[patSnaps.length-1];
+            const invItems=PATRIMONIO_ATIVOS.filter(a=>a.grupo==="investimento");
+            const hasData=invItems.some(a=>latest.ativos?.[a.id]?.valor);
+            if(!hasData) return null;
+            return(
+              <Card>
+                <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>📈 Detalhe de Investimentos — {latest.mes}</p>
+                {invItems.map(item=>{
+                  const d=latest.ativos?.[item.id];
+                  if(!d?.valor) return null;
+                  const ganho=(d.valor||0)-(d.investido||0);
+                  const pct=d.investido?ganho/d.investido*100:null;
+                  return(
+                    <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #0d1a2e"}}>
+                      <span style={{fontSize:18,width:28}}>{item.icon}</span>
+                      <div style={{flex:1}}>
+                        <p style={{fontSize:13,fontWeight:500,marginBottom:3}}>{item.label}</p>
+                        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                          {d.investido&&<span style={{fontSize:11,color:"#64748b"}}>Investido: {fE0(d.investido)}</span>}
+                          <span style={{fontSize:11,color:"#fff"}}>Atual: {fE0(d.valor)}</span>
+                          {d.investido&&<span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE0(Math.abs(ganho))} {pct!==null?`(${pct>=0?"+":""}${pct.toFixed(1)}%)`:""}</span>}
+                        </div>
+                        {d.investido&&<PBar val={d.valor} max={Math.max(d.valor,d.investido)} color={ganho>=0?"#22c55e":"#ef4444"}/>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </Card>
+            );
+          })()}
+
+        </div>
+
+        {isMobile&&<div className="tabbar">
+          <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
+          <button onClick={()=>{setScreen("gestao");setTab("dashboard");}}><span style={{fontSize:18}}>💳</span>Gestão</button>
+          <button onClick={()=>setScreen("plano")}><span style={{fontSize:18}}>🎯</span>Plano</button>
+        </div>}
       </div>
     </>
   );
