@@ -378,6 +378,7 @@ export default function App(){
 
   const [cats,setCats,forceCats]=useLS("fin_cats_v6",DEFAULT_CATS);
 
+  const [patSnaps,setPatSnaps]=useLS("fin_pat_v1",[]);
   const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats,patSnaps}),[trans,pend,contas,orcs,snaps,cats,patSnaps]);
   const handleDriveLoad=useCallback(json=>{
     if(!json) return;
@@ -399,7 +400,6 @@ export default function App(){
   const [importMsg,setImportMsg]=useState("");
   const [simExtra,setSimExtra]=useState(0);
   const [newSnap,setNewSnap]=useState("");
-  const [patSnaps,setPatSnaps]=useLS("fin_pat_v1",[]);
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
   const [dismissedAlerts,setDismissedAlerts]=useState(new Set());
@@ -638,6 +638,42 @@ export default function App(){
               <span style={{fontSize:11}}>{deviation>=0?"✅":"⚠️"}</span>
               <span style={{fontSize:11,color:deviation>=0?"#22c55e":"#ef4444"}}>{deviation>=0?"No plano":"Abaixo"} · {deviation>=0?"+":""}{fE0(deviation)}</span>
             </div>
+          </div>
+
+          {/* Património */}
+          <div onClick={()=>setScreen("patrimonio")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
+            onMouseEnter={e=>{if(!isMobile){e.currentTarget.style.borderColor="#a855f7";e.currentTarget.style.transform="translateY(-3px)";}}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3048";e.currentTarget.style.transform="translateY(0)";}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+              <div style={{fontSize:24,width:44,height:44,background:"rgba(168,85,247,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>💎</div>
+              <div><h2 style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:2}}>Património Líquido</h2><p style={{fontSize:12,color:"#64748b"}}>Ativos · Passivos · Investimentos</p></div>
+              <span style={{marginLeft:"auto",color:"#a855f7",fontSize:18}}>›</span>
+            </div>
+            {(()=>{
+              const latest=patSnaps[patSnaps.length-1];
+              if(!latest) return <p style={{fontSize:12,color:"#64748b"}}>Sem dados ainda. Regista o primeiro mês.</p>;
+              const totalA=Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+              const totalP=Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
+              const pat=totalA-totalP;
+              const prev=patSnaps[patSnaps.length-2];
+              const prevPat=prev?Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0):null;
+              const diff=prevPat!==null?pat-prevPat:null;
+              return(
+                <div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                    <div style={{background:"rgba(168,85,247,0.08)",borderRadius:10,padding:"8px 12px"}}>
+                      <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Património Líquido</p>
+                      <p style={{fontSize:16,fontWeight:600,color:"#a855f7"}}>{fE0(pat)}</p>
+                    </div>
+                    <div style={{background:diff&&diff>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}>
+                      <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>vs mês anterior</p>
+                      <p style={{fontSize:16,fontWeight:600,color:diff&&diff>=0?"#22c55e":"#ef4444"}}>{diff!==null?`${diff>=0?"+":""}${fE0(diff)}`:"—"}</p>
+                    </div>
+                  </div>
+                  <p style={{fontSize:10,color:"#64748b"}}>Último registo: {latest.mes}</p>
+                </div>
+              );
+            })()}
           </div>
         </div>
         <div style={{width:"100%",maxWidth:480}}>
