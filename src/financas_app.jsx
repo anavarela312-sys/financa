@@ -718,9 +718,24 @@ export default function App(){
           </div>
         </div>
         <div style={{width:"100%",maxWidth:480}}>
+          {/* Empresa WIP card */}
+          <div style={{background:"#0d1a2e",border:"1px dashed #1e3048",borderRadius:18,padding:20,marginBottom:12,opacity:0.7}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{fontSize:24,width:44,height:44,background:"rgba(245,158,11,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🏢</div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+                  <h2 style={{fontSize:16,fontWeight:600,color:"#fff"}}>Empresa</h2>
+                  <span style={{fontSize:10,background:"rgba(245,158,11,0.15)",color:"#f59e0b",padding:"2px 8px",borderRadius:20,fontWeight:600}}>em breve</span>
+                </div>
+                <p style={{fontSize:12,color:"#64748b"}}>Linguagem Entusiasta · Gestão financeira</p>
+              </div>
+            </div>
+          </div>
+
           <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"12px 16px",textAlign:"center",marginBottom:10}}>
-            <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total</p>
+            <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total em Contas</p>
             <p style={{fontSize:26,fontWeight:600,color:"#fff"}}>{fE(patrimonioTotal)}</p>
+            <p style={{fontSize:10,color:"#64748b",marginTop:3}}>Millennium + Caixinhas + Investimentos</p>
           </div>
           <div style={{display:"flex",gap:8,marginTop:10}}>
             <button onClick={exportJSON} style={{flex:1,padding:"10px",background:"rgba(59,130,246,0.1)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,fontSize:12}}>↓ Exportar backup</button>
@@ -1210,58 +1225,152 @@ export default function App(){
             </Card>
           )}
 
-          {/* Register month form */}
+          {/* Register month form — Excel style */}
           <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
               <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Registar mês</p>
-              <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
-                onChange={e=>{
-                  setPatEdit(e.target.value);
-                  const existing=patSnaps.find(s=>s.mes===e.target.value);
-                  if(existing) setPatDraft({ativos:{...existing.ativos},passivos:{...existing.passivos}});
-                  else setPatDraft({ativos:{},passivos:{}});
-                }}
-                style={{fontSize:12,padding:"6px 10px",width:"auto"}}/>
-            </div>
-            <p style={{fontSize:11,fontWeight:600,color:"#22c55e",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Ativos</p>
-            {GRUPOS_ATIVOS.map(grupo=>(
-              <div key={grupo.id} style={{marginBottom:14}}>
-                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>{grupo.icon} {grupo.label}</p>
-                {PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).map(item=>{
-                  const d=patDraft.ativos?.[item.id]||{valor:"",investido:""};
-                  return(
-                    <div key={item.id} style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"3fr 1fr 1fr",gap:8,marginBottom:6,padding:"8px 12px",background:"rgba(255,255,255,0.02)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:15}}>{item.icon}</span>
-                        <span style={{fontSize:12,color:"#e2e8f0"}}>{item.label}</span>
-                        {!item.fixo&&d.valor&&d.investido&&(()=>{
-                          const g=(d.valor||0)-(d.investido||0);const p=d.investido?g/d.investido*100:0;
-                          return <span style={{fontSize:10,color:g>=0?"#22c55e":"#ef4444",fontWeight:600}}>{g>=0?"↑":"↓"}{fE0(Math.abs(g))} ({p>=0?"+":""}{ p.toFixed(1)}%)</span>;
-                        })()}
-                      </div>
-                      <div><Lbl>Valor atual</Lbl><input type="number" value={d.valor} placeholder="0" onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:parseFloat(e.target.value)||""}}}))} style={{fontSize:12}}/></div>
-                      {!item.fixo&&<div><Lbl>Investido</Lbl><input type="number" value={d.investido} placeholder="0" onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))} style={{fontSize:12}}/></div>}
-                    </div>
-                  );
-                })}
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
+                  onChange={e=>{
+                    setPatEdit(e.target.value);
+                    const existing=patSnaps.find(s=>s.mes===e.target.value);
+                    if(existing) setPatDraft({ativos:{...existing.ativos},passivos:{...existing.passivos}});
+                    else setPatDraft({ativos:{},passivos:{}});
+                  }}
+                  style={{fontSize:12,padding:"6px 10px",width:"auto"}}/>
+                {(()=>{
+                  const prevMes=patSnaps[patSnaps.length-1];
+                  return prevMes&&prevMes.mes!==(patEdit||new Date().toISOString().slice(0,7))?(
+                    <button onClick={()=>{
+                      setPatDraft({ativos:{...prevMes.ativos},passivos:{...prevMes.passivos}});
+                    }} style={{background:"rgba(168,85,247,0.15)",color:"#a855f7",border:"1px solid rgba(168,85,247,0.3)",borderRadius:8,padding:"6px 12px",fontSize:11,cursor:"pointer"}}>
+                      📋 Copiar {prevMes.mes}
+                    </button>
+                  ):null;
+                })()}
               </div>
-            ))}
-            <p style={{fontSize:11,fontWeight:600,color:"#ef4444",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Passivos</p>
-            {PATRIMONIO_PASSIVOS.map(item=>{
-              const val=patDraft.passivos?.[item.id]||"";
-              return(
-                <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:6,padding:"8px 12px",background:"rgba(239,68,68,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15}}>{item.icon}</span><span style={{fontSize:12,color:"#e2e8f0"}}>{item.label}</span></div>
-                  <div><Lbl>Em dívida</Lbl><input type="number" value={val} placeholder="0" onChange={e=>setPatDraft(p=>({...p,passivos:{...p.passivos,[item.id]:parseFloat(e.target.value)||""}}))} style={{fontSize:12}}/></div>
-                </div>
-              );
-            })}
+            </div>
+
+            {/* Excel-style table */}
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                <thead>
+                  <tr style={{background:"rgba(255,255,255,0.03)"}}>
+                    <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"45%"}}>Rubrica</th>
+                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"25%"}}>Valor atual (€)</th>
+                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"20%"}}>Investido (€)</th>
+                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"10%"}}>+/-</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* ATIVOS */}
+                  {GRUPOS_ATIVOS.map(grupo=>(
+                    <>
+                      <tr key={"h_"+grupo.id}>
+                        <td colSpan={4} style={{padding:"10px 12px 4px",fontSize:11,fontWeight:700,color:grupo.color,textTransform:"uppercase",letterSpacing:1,background:"rgba(255,255,255,0.02)",borderTop:"1px solid #1e3048"}}>
+                          {grupo.icon} {grupo.label}
+                        </td>
+                      </tr>
+                      {PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).map(item=>{
+                        const d=patDraft.ativos?.[item.id]||{valor:"",investido:""};
+                        const ganho=d.valor&&d.investido?(d.valor-d.investido):null;
+                        const pct=ganho!==null&&d.investido?ganho/d.investido*100:null;
+                        return(
+                          <tr key={item.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}} className="hrow">
+                            <td style={{padding:"6px 12px"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                <span style={{fontSize:14}}>{item.icon}</span>
+                                <span style={{color:"#e2e8f0"}}>{item.label}</span>
+                              </div>
+                            </td>
+                            <td style={{padding:"4px 8px",textAlign:"right"}}>
+                              <input type="number" value={d.valor} placeholder="—"
+                                onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:parseFloat(e.target.value)||""}}}))}
+                                style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
+                            </td>
+                            <td style={{padding:"4px 8px",textAlign:"right"}}>
+                              {!item.fixo?(
+                                <input type="number" value={d.investido} placeholder="—"
+                                  onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
+                                  style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
+                              ):<span style={{color:"#64748b",fontSize:12}}>—</span>}
+                            </td>
+                            <td style={{padding:"6px 8px",textAlign:"right"}}>
+                              {ganho!==null?(
+                                <span style={{fontSize:11,fontWeight:600,color:ganho>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>
+                                  {ganho>=0?"↑":"↓"}{pct!==null?`${Math.abs(pct).toFixed(1)}%`:""}
+                                </span>
+                              ):<span style={{color:"#64748b"}}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr key={"t_"+grupo.id} style={{background:"rgba(34,197,94,0.04)"}}>
+                        <td style={{padding:"6px 12px",fontSize:12,color:"#64748b",fontStyle:"italic"}}>Total {grupo.label}</td>
+                        <td style={{padding:"6px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:"#22c55e"}}>
+                          {fE(PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).reduce((s,item)=>{
+                            const v=patDraft.ativos?.[item.id]?.valor||0;
+                            return s+(typeof v==="number"?v:parseFloat(v)||0);
+                          },0))}
+                        </td>
+                        <td colSpan={2}/>
+                      </tr>
+                    </>
+                  ))}
+                  {/* PASSIVOS */}
+                  <tr>
+                    <td colSpan={4} style={{padding:"10px 12px 4px",fontSize:11,fontWeight:700,color:"#ef4444",textTransform:"uppercase",letterSpacing:1,background:"rgba(239,68,68,0.04)",borderTop:"2px solid #1e3048"}}>
+                      🔴 Passivos
+                    </td>
+                  </tr>
+                  {PATRIMONIO_PASSIVOS.map(item=>{
+                    const val=patDraft.passivos?.[item.id]||"";
+                    return(
+                      <tr key={item.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}} className="hrow">
+                        <td style={{padding:"6px 12px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:14}}>{item.icon}</span>
+                            <span style={{color:"#e2e8f0"}}>{item.label}</span>
+                          </div>
+                        </td>
+                        <td style={{padding:"4px 8px",textAlign:"right"}}>
+                          <input type="number" value={val} placeholder="—"
+                            onChange={e=>setPatDraft(p=>({...p,passivos:{...p.passivos,[item.id]:parseFloat(e.target.value)||""}}))}
+                            style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#ef4444"}}/>
+                        </td>
+                        <td colSpan={2}/>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{background:"rgba(239,68,68,0.04)"}}>
+                    <td style={{padding:"6px 12px",fontSize:12,color:"#64748b",fontStyle:"italic"}}>Total Passivos</td>
+                    <td style={{padding:"6px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:"#ef4444"}}>
+                      {fE(PATRIMONIO_PASSIVOS.reduce((s,item)=>{const v=patDraft.passivos?.[item.id]||0;return s+(typeof v==="number"?v:parseFloat(v)||0);},0))}
+                    </td>
+                    <td colSpan={2}/>
+                  </tr>
+                  {/* TOTAL */}
+                  <tr style={{background:"rgba(168,85,247,0.08)",borderTop:"2px solid #a855f7"}}>
+                    <td style={{padding:"10px 12px",fontSize:13,fontWeight:700,color:"#a855f7"}}>✦ Património Líquido</td>
+                    <td style={{padding:"10px 12px",textAlign:"right",fontSize:16,fontWeight:800,color:"#a855f7"}}>
+                      {fE((()=>{
+                        const tA=PATRIMONIO_ATIVOS.reduce((s,item)=>{const v=patDraft.ativos?.[item.id]?.valor||0;return s+(typeof v==="number"?v:parseFloat(v)||0);},0);
+                        const tP=PATRIMONIO_PASSIVOS.reduce((s,item)=>{const v=patDraft.passivos?.[item.id]||0;return s+(typeof v==="number"?v:parseFloat(v)||0);},0);
+                        return tA-tP;
+                      })())}
+                    </td>
+                    <td colSpan={2}/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <button onClick={()=>{
               const mes=patEdit||new Date().toISOString().slice(0,7);
               const snap={mes,ativos:patDraft.ativos,passivos:patDraft.passivos};
               setPatSnaps(prev=>{const filtered=prev.filter(s=>s.mes!==mes);return[...filtered,snap].sort((a,b)=>a.mes.localeCompare(b.mes));});
               setPatDraft({ativos:{},passivos:{}});
-            }} style={{width:"100%",background:"#a855f7",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,marginTop:14,cursor:"pointer"}}>
+            }} style={{width:"100%",background:"#a855f7",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,marginTop:16,cursor:"pointer"}}>
               ✓ Guardar {patEdit||new Date().toISOString().slice(0,7)}
             </button>
           </Card>
