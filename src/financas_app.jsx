@@ -248,6 +248,30 @@ const DEF_CONTAS=[
   {id:"ppr_lex",nome:"PPR Alves Ribeiro — Lexie",tipo:"investimento",secao:"investimento",saldo:0,cor:"#ec4899",icon:"👧"},
   {id:"xtb",   nome:"XTB",             tipo:"investimento",secao:"investimento",saldo:1400, cor:"#f59e0b", icon:"📈"},
 ];
+// Migrate old accounts to new structure
+function migrateContas(old) {
+  if (!old || !old.length) return DEF_CONTAS;
+  // Check if already migrated (has secao field)
+  if (old[0]?.secao) return old;
+  // Map old ids to new structure
+  const map = {
+    "mill": {secao:"corrente"},
+    "app":  {secao:"caixinha", id:"cx_meal", nome:"Mealheiro", icon:"🏺"},
+    "opt":  {secao:"investimento", id:"opt_ana", nome:"Optimize Ana", icon:"📊"},
+    "xtb":  {secao:"investimento"},
+    "cart": {secao:"corrente"},
+    "lexc": {secao:"caixinha", id:"cx_lex", nome:"Lexie", icon:"👧"},
+  };
+  const migrated = old.map(c => {
+    const m = map[c.id] || {secao:"corrente"};
+    return {...c, ...m, secao: m.secao};
+  });
+  // Add missing new accounts that don't exist yet
+  const existingIds = new Set(migrated.map(c => c.id));
+  const missing = DEF_CONTAS.filter(c => !existingIds.has(c.id));
+  return [...migrated, ...missing];
+}
+
 const DEF_ORC={"2026-04":{"Casa":1826,"Saúde":626,"Créditos":310,"Animais":161,"Alimentação":185,"Mensalidades":57,"Mina Santos":87,"Educação":112,"Lazer":75,"Lexie":51,"Prendas":31,"Carro":100,"Vários / Extras":100,"Investimento":100,"Donativos":11,"Despesas bancárias":10}};
 const DEF_SNAPS=[{label:"Mar 2026",year:2026,month:2,planned:1000,actual:1000,note:"Início"},{label:"Abr 2026",year:2026,month:3,planned:1800,actual:1350,note:"Imprevistos"}];
 
@@ -373,6 +397,12 @@ export default function App(){
   const [trans,setTrans,forceTrans]=useLS("fin_trans_v6",[]);
   const [pend,setPend,forcePend]=useLS("fin_pend_v6",[]);
   const [contas,setContas,forceContas]=useLS("fin_contas_v6",DEF_CONTAS);
+  // Auto-migrate accounts on first load
+  useEffect(() => {
+    if (contas.length && !contas[0]?.secao) {
+      forceContas(migrateContas(contas));
+    }
+  }, []);
   const [orcs,setOrcs,forceOrcs]=useLS("fin_orcs_v6",DEF_ORC);
   const [snaps,setSnaps,forceSnaps]=useLS("fin_snaps_v6",DEF_SNAPS);
 
@@ -384,7 +414,7 @@ export default function App(){
     if(!json) return;
     if(json.trans?.length>0) forceTrans(json.trans);
     if(json.pend?.length>0) forcePend(json.pend);
-    if(json.contas?.length>0) forceContas(json.contas);
+    if(json.contas?.length>0) forceContas(migrateContas(json.contas));
     if(json.orcs && Object.keys(json.orcs).length>0) forceOrcs(json.orcs);
     if(json.snaps?.length>0) forceSnaps(json.snaps);
     if(json.cats && Object.keys(json.cats).length>0) forceCats(json.cats);
@@ -399,6 +429,7 @@ export default function App(){
   const [orcEdit,setOrcEdit]=useState(false);
   const [importMsg,setImportMsg]=useState("");
   const [simExtra,setSimExtra]=useState(0);
+  const [planoTab,setPlanoTab]=useState("plano");
   const [newSnap,setNewSnap]=useState("");
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
@@ -932,10 +963,21 @@ export default function App(){
       <style>{CSS}</style>
       <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
         <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
-          <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12}}>← Hub</button>
+          <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
           <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>🎯 Liberdade Financeira</p>
+          <div style={{display:"flex",gap:0,marginLeft:"auto",background:"rgba(255,255,255,0.05)",borderRadius:10,padding:3}}>
+            {["plano","patrimonio"].map(t=>(
+              <button key={t} onClick={()=>setPlanoTab(t)}
+                style={{padding:"5px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:planoTab===t?"rgba(59,130,246,0.3)":"none",color:planoTab===t?"#fff":"#64748b",border:"none",cursor:"pointer"}}>
+                {t==="plano"?"📋 Plano":"💎 Património"}
+              </button>
+            ))}
+          </div>
         </div>
-        <div style={{padding:mainPad,maxWidth:isMobile?undefined:860,margin:"0 auto"}} className="fade">
+        <div style={{padding:mainPad,maxWidth:isMobile?undefined:960,margin:"0 auto"}} className="fade">
+
+        {/* ── TAB: PLANO ── */}
+        <div style={{display:planoTab==="plano"?"block":"none"}}>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:16}}>
             {PLAN_LEVELS.map(lv=>{const isA=lv.id===1;return(
               <div key={lv.id} style={{background:"#0d1a2e",border:`1px solid ${isA?lv.color+"55":"#1e3048"}`,borderRadius:14,padding:12,opacity:isA?1:0.55}}>
@@ -1003,8 +1045,224 @@ export default function App(){
             </div>
           </Card>
         </div>
-        {isMobile&&<div className="tabbar"><button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button><button onClick={()=>{setScreen("gestao");setTab("dashboard");}}><span style={{fontSize:18}}>💳</span>Gestão</button></div>}
-      </div>
+        </div>
+
+        {/* ── TAB: PATRIMÓNIO ── */}
+        <div style={{display:planoTab==="patrimonio"?"block":"none"}}>
+
+          {/* KPIs */}
+          {(()=>{
+            const latest=patSnaps[patSnaps.length-1];
+            const prev=patSnaps[patSnaps.length-2];
+            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Regista o primeiro mês abaixo.</p></Card>;
+            const tA=Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+            const tP=Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
+            const pat=tA-tP;
+            const prevPat=prev?Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0):null;
+            const diff=prevPat!==null?pat-prevPat:null;
+            const pct=prevPat?(diff/Math.abs(prevPat)*100):null;
+            return(
+              <div style={{marginBottom:14}}>
+                <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{latest.mes} · último registo</p>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:10}}>
+                  {[
+                    {label:"Total Ativos",val:tA,color:"#22c55e"},
+                    {label:"Total Passivos",val:tP,color:"#ef4444"},
+                    {label:"Património Líquido",val:pat,color:"#a855f7"},
+                    {label:"Variação mensal",val:diff,color:diff===null?null:diff>=0?"#22c55e":"#ef4444",pct,isVar:true},
+                  ].map(k=>(
+                    <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
+                      <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
+                      {k.val!==null&&k.val!==undefined
+                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||"#fff"}}>{k.val>=0?"+":""}{fE0(k.val)}</p>
+                        :<p style={{fontSize:14,color:"#64748b"}}>—</p>}
+                      {k.isVar&&k.pct!==null&&k.pct!==undefined&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Evolution chart — bar chart */}
+          {patSnaps.length>1&&(()=>{
+            const maxPat=Math.max(...patSnaps.map(s=>{
+              const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+              const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
+              return tA-tP;
+            }));
+            return(
+              <Card>
+                <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução do Património Líquido</p>
+                <div style={{display:"flex",gap:8,alignItems:"flex-end",height:100}}>
+                  {patSnaps.map((s,i)=>{
+                    const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+                    const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
+                    const pat=tA-tP;
+                    const h=maxPat>0?(pat/maxPat)*80:0;
+                    const prev=patSnaps[i-1];
+                    const prevPat=prev?Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0):null;
+                    const diff=prevPat!==null?pat-prevPat:null;
+                    return(
+                      <div key={s.mes} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                        <p style={{fontSize:8,color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444",minHeight:10}}>{diff!==null?(diff>=0?"↑":"↓"):""}</p>
+                        <div style={{width:"100%",height:Math.max(h,3),background:"#a855f7",borderRadius:"5px 5px 0 0",transition:"height 0.5s"}}/>
+                        <p style={{fontSize:9,color:"#64748b"}}>{s.mes.slice(5)}</p>
+                        <p style={{fontSize:10,fontWeight:600,color:"#94a3b8"}}>{fE0(pat)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            );
+          })()}
+
+          {/* Investments growth detail */}
+          {patSnaps.length>0&&(()=>{
+            const latest=patSnaps[patSnaps.length-1];
+            const invItems=PATRIMONIO_ATIVOS.filter(a=>a.grupo==="investimento");
+            const hasData=invItems.some(a=>latest.ativos?.[a.id]?.valor);
+            if(!hasData) return null;
+            return(
+              <Card>
+                <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>📈 Crescimento dos Investimentos</p>
+                {invItems.map(item=>{
+                  const latest_d=latest.ativos?.[item.id];
+                  if(!latest_d?.valor) return null;
+                  // Find first snapshot with this investment
+                  const history=patSnaps.map(s=>({mes:s.mes,d:s.ativos?.[item.id]})).filter(x=>x.d?.valor);
+                  const first=history[0];
+                  const ganhoTotal=(latest_d.valor||0)-(latest_d.investido||0);
+                  const pctTotal=latest_d.investido?ganhoTotal/latest_d.investido*100:null;
+                  const ganhoMes=history.length>1?(latest_d.valor-(history[history.length-2]?.d?.valor||latest_d.valor)):null;
+                  return(
+                    <div key={item.id} style={{padding:"12px 0",borderBottom:"1px solid #0d1a2e"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                        <span style={{fontSize:18,width:28}}>{item.icon}</span>
+                        <div style={{flex:1}}>
+                          <p style={{fontSize:13,fontWeight:500}}>{item.label}</p>
+                          <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:2}}>
+                            {latest_d.investido&&<span style={{fontSize:11,color:"#64748b"}}>Investido: {fE0(latest_d.investido)}</span>}
+                            <span style={{fontSize:11,color:"#e2e8f0"}}>Atual: {fE0(latest_d.valor)}</span>
+                            {ganhoTotal!==0&&<span style={{fontSize:11,color:ganhoTotal>=0?"#22c55e":"#ef4444",fontWeight:600}}>
+                              {ganhoTotal>=0?"↑":"↓"} {fE0(Math.abs(ganhoTotal))} {pctTotal!==null?`(${pctTotal>=0?"+":""}${pctTotal.toFixed(1)}%)`:""}
+                            </span>}
+                            {ganhoMes!==null&&<span style={{fontSize:11,color:ganhoMes>=0?"#22c55e":"#ef4444"}}>
+                              Mês: {ganhoMes>=0?"+":""}{fE0(ganhoMes)}
+                            </span>}
+                          </div>
+                        </div>
+                      </div>
+                      {latest_d.investido&&<PBar val={latest_d.valor} max={Math.max(latest_d.valor,latest_d.investido)} color={ganhoTotal>=0?"#22c55e":"#ef4444"}/>}
+                    </div>
+                  );
+                })}
+              </Card>
+            );
+          })()}
+
+          {/* Historical table */}
+          {patSnaps.length>1&&(
+            <Card>
+              <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Histórico</p>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:480}}>
+                  <thead>
+                    <tr style={{borderBottom:"1px solid #1e3048"}}>
+                      {["Mês","Ativos","Passivos","Pat. Líquido","Variação","Var %"].map(h=>(
+                        <th key={h} style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...patSnaps].reverse().map((s,i,arr)=>{
+                      const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+                      const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
+                      const pat=tA-tP;
+                      const prevS=arr[i+1];
+                      const prevPat=prevS?Object.values(prevS.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prevS.passivos||{}).reduce((a,v)=>a+v,0):null;
+                      const diff=prevPat!==null?pat-prevPat:null;
+                      const pct=prevPat?(diff/Math.abs(prevPat)*100):null;
+                      return(
+                        <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
+                          <td style={{padding:"9px 8px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
+                          <td style={{padding:"9px 8px",color:"#22c55e"}}>{fE0(tA)}</td>
+                          <td style={{padding:"9px 8px",color:"#ef4444"}}>{fE0(tP)}</td>
+                          <td style={{padding:"9px 8px",fontWeight:700,color:"#a855f7"}}>{fE0(pat)}</td>
+                          <td style={{padding:"9px 8px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE0(diff)}`}</td>
+                          <td style={{padding:"9px 8px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Register month form */}
+          <Card>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Registar mês</p>
+              <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
+                onChange={e=>{
+                  setPatEdit(e.target.value);
+                  const existing=patSnaps.find(s=>s.mes===e.target.value);
+                  if(existing) setPatDraft({ativos:{...existing.ativos},passivos:{...existing.passivos}});
+                  else setPatDraft({ativos:{},passivos:{}});
+                }}
+                style={{fontSize:12,padding:"6px 10px",width:"auto"}}/>
+            </div>
+            <p style={{fontSize:11,fontWeight:600,color:"#22c55e",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Ativos</p>
+            {GRUPOS_ATIVOS.map(grupo=>(
+              <div key={grupo.id} style={{marginBottom:14}}>
+                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>{grupo.icon} {grupo.label}</p>
+                {PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).map(item=>{
+                  const d=patDraft.ativos?.[item.id]||{valor:"",investido:""};
+                  return(
+                    <div key={item.id} style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"3fr 1fr 1fr",gap:8,marginBottom:6,padding:"8px 12px",background:"rgba(255,255,255,0.02)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:15}}>{item.icon}</span>
+                        <span style={{fontSize:12,color:"#e2e8f0"}}>{item.label}</span>
+                        {!item.fixo&&d.valor&&d.investido&&(()=>{
+                          const g=(d.valor||0)-(d.investido||0);const p=d.investido?g/d.investido*100:0;
+                          return <span style={{fontSize:10,color:g>=0?"#22c55e":"#ef4444",fontWeight:600}}>{g>=0?"↑":"↓"}{fE0(Math.abs(g))} ({p>=0?"+":""}{ p.toFixed(1)}%)</span>;
+                        })()}
+                      </div>
+                      <div><Lbl>Valor atual</Lbl><input type="number" value={d.valor} placeholder="0" onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:parseFloat(e.target.value)||""}}}))} style={{fontSize:12}}/></div>
+                      {!item.fixo&&<div><Lbl>Investido</Lbl><input type="number" value={d.investido} placeholder="0" onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))} style={{fontSize:12}}/></div>}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            <p style={{fontSize:11,fontWeight:600,color:"#ef4444",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Passivos</p>
+            {PATRIMONIO_PASSIVOS.map(item=>{
+              const val=patDraft.passivos?.[item.id]||"";
+              return(
+                <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:6,padding:"8px 12px",background:"rgba(239,68,68,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15}}>{item.icon}</span><span style={{fontSize:12,color:"#e2e8f0"}}>{item.label}</span></div>
+                  <div><Lbl>Em dívida</Lbl><input type="number" value={val} placeholder="0" onChange={e=>setPatDraft(p=>({...p,passivos:{...p.passivos,[item.id]:parseFloat(e.target.value)||""}}))} style={{fontSize:12}}/></div>
+                </div>
+              );
+            })}
+            <button onClick={()=>{
+              const mes=patEdit||new Date().toISOString().slice(0,7);
+              const snap={mes,ativos:patDraft.ativos,passivos:patDraft.passivos};
+              setPatSnaps(prev=>{const filtered=prev.filter(s=>s.mes!==mes);return[...filtered,snap].sort((a,b)=>a.mes.localeCompare(b.mes));});
+              setPatDraft({ativos:{},passivos:{}});
+            }} style={{width:"100%",background:"#a855f7",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,marginTop:14,cursor:"pointer"}}>
+              ✓ Guardar {patEdit||new Date().toISOString().slice(0,7)}
+            </button>
+          </Card>
+
+        </div>
+        </div>
+
+        {isMobile&&<div className="tabbar">
+          <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
+          <button onClick={()=>{setScreen("gestao");setTab("dashboard");}}><span style={{fontSize:18}}>💳</span>Gestão</button>
+        </div>}
     </>
   );
 
