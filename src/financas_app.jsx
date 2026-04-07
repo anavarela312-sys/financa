@@ -1348,33 +1348,42 @@ export default function App(){
               {/* Contas */}
               <Card>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Contas</p><button onClick={()=>setTab("contas")} style={{background:"none",border:"none",color:"#3b82f6",fontSize:12,cursor:"pointer"}}>Gerir →</button></div>
-                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
                   {CONTA_SECOES.map(sec=>{
                     const secContas=contas.filter(c=>c.secao===sec.id);
                     if(!secContas.length) return null;
                     const secTotal=secContas.reduce((a,c)=>a+c.saldo,0);
                     return(
                       <div key={sec.id}>
-                        {/* Section label + total */}
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        {/* Section label */}
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                           <span style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{sec.icon} {sec.label}</span>
-                          <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fE0(secTotal)}</span>
                         </div>
-                        {/* Accounts in a horizontal scrollable row */}
+                        {/* Accounts + total card in same row */}
                         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
                           {secContas.map(c=>(
-                            <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:90}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                            <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95}}>
+                              <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
                                 <span style={{fontSize:13}}>{c.icon}</span>
-                                <span style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:70}}>{c.nome}</span>
+                                <span style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:72}}>{c.nome}</span>
                               </div>
-                              <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE0(c.saldo)}</p>
+                              <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(c.saldo)}</p>
                             </div>
                           ))}
+                          {/* Total card at the end of each row */}
+                          <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95,display:"flex",flexDirection:"column",justifyContent:"center"}}>
+                            <span style={{fontSize:10,color:"#22c55e",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Total</span>
+                            <p style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE(secTotal)}</p>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
+                  {/* Grand total */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:10,marginTop:4}}>
+                    <span style={{fontSize:12,color:"#64748b"}}>✦ Total de contas</span>
+                    <span style={{fontSize:16,fontWeight:700,color:"#fff"}}>{fE(patrimonioTotal)}</span>
+                  </div>
                 </div>
               </Card>
 
