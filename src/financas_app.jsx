@@ -631,10 +631,10 @@ export default function App(){
     {id:"orcamento",label:"Orçamento",icon:"◉"},
     {id:"transacoes",label:"Movimentos",icon:"≡"},
     {id:"importar",label:"Importar",icon:"↑"},
-    {id:"contas",label:"Contas",icon:"◇"},
     {id:"config",label:"Configurações",icon:"⚙"},
   ];
   const configSubTabs=[
+    {id:"contas",label:"Contas",icon:"◇"},
     {id:"categorizar",label:`Categorizar${pend.length?` (${pend.length})`:""}`,icon:"◎"},
     {id:"categorias",label:"Categorias",icon:"⊞"},
   ];
@@ -1375,9 +1375,13 @@ export default function App(){
                         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                           <span style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{sec.icon} {sec.label}</span>
                         </div>
-                        {/* Accounts + total card in same row */}
+                        {/* Total card FIRST, then accounts */}
                         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
-                          {secContas.map(c=>(
+                          <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95,display:"flex",flexDirection:"column",justifyContent:"center"}}>
+                            <span style={{fontSize:10,color:"#22c55e",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Total</span>
+                            <p style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE(secTotal)}</p>
+                          </div>
+                          {[...secContas].sort((a,b)=>a.nome.localeCompare(b.nome,"pt")).map(c=>(
                             <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95}}>
                               <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
                                 <span style={{fontSize:13}}>{c.icon}</span>
@@ -1386,11 +1390,6 @@ export default function App(){
                               <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(c.saldo)}</p>
                             </div>
                           ))}
-                          {/* Total card at the end of each row */}
-                          <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95,display:"flex",flexDirection:"column",justifyContent:"center"}}>
-                            <span style={{fontSize:10,color:"#22c55e",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Total</span>
-                            <p style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE(secTotal)}</p>
-                          </div>
                         </div>
                       </div>
                     );
@@ -1472,9 +1471,9 @@ export default function App(){
 
               {/* Receitas detail */}
               {rec.length>0&&(
-                <Card style={{marginBottom:12,background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.2)"}}>
+                <Card style={{marginBottom:12,background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.2)",cursor:"pointer"}} onClick={()=>setCatModal("Receita")}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <p style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>💵 Receitas</p>
+                    <p style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>💵 Receitas <span style={{fontSize:10,color:"#64748b",fontWeight:400}}>— clica para ver movimentos</span></p>
                     <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE0(totR)}</span>
                   </div>
                   {Object.entries(catData["Receita"]?.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
@@ -1488,7 +1487,7 @@ export default function App(){
 
               {/* Despesas por categoria */}
               <Card>
-                {Object.keys(cats).filter(c=>!["Transferência Interna","Receita","Poupança"].includes(c)).map(cat=>{
+                {Object.keys(cats).filter(c=>!["Transferência Interna","Receita","Poupança"].includes(c)).sort((a,b)=>a.localeCompare(b,"pt")).map(cat=>{
                   const cfg=cats[cat],orc=orcMes[cat]||0,d=catData[cat]||{out:0,in:0,subs:{}};
                   const net=NET_CATS.has(cat)?d.out-d.in:d.out,over=net>orc&&orc>0;
                   return(
@@ -1509,7 +1508,7 @@ export default function App(){
                       {(Object.entries(d.subs||{}).filter(([,v])=>v>0).length>0||orcEdit)&&(
                         <div style={{marginTop:4}}>
                           {/* Real spending per sub */}
-                          {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
+                          {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>a[0].localeCompare(b[0],"pt")).map(([sub,val])=>(
                             <div key={sub} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0 3px 30px"}}>
                               <span style={{fontSize:11,color:"#64748b"}}>{sub||"Sem subcategoria"}</span>
                               <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -1518,7 +1517,7 @@ export default function App(){
                             </div>
                           ))}
                           {/* Sub-budget inputs when editing */}
-                          {orcEdit&&(cats[cat]?.subs||[]).map(sub=>{
+                          {orcEdit&&[...(cats[cat]?.subs||[])].sort((a,b)=>a.localeCompare(b,"pt")).map(sub=>{
                             const subOrcKey=`${cat}::${sub}`;
                             const subOrc=orcMes[subOrcKey]||0;
                             return(
@@ -1878,9 +1877,8 @@ export default function App(){
         {isMobile&&(
           <div className="tabbar">
             <button onClick={()=>setScreen("landing")} style={{fontSize:10,color:"#64748b",flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none"}}><span style={{fontSize:18}}>🏠</span>Hub</button>
-            {navItems.filter(n=>!["contas","config"].includes(n.id)).map(n=><button key={n.id} className={tab===n.id?"act":""} onClick={()=>setTab(n.id==="config"?"categorizar":n.id)}><span style={{fontSize:18}}>{n.icon}</span>{n.label}</button>)}
-            <button className={tab==="contas"?"act":""} onClick={()=>setTab("contas")}><span style={{fontSize:18}}>◇</span>Contas</button>
-            <button className={(tab==="categorizar"||tab==="categorias")?"act":""} onClick={()=>setTab("categorizar")}><span style={{fontSize:18}}>⚙</span>Config</button>
+            {navItems.filter(n=>n.id!=="config").map(n=><button key={n.id} className={tab===n.id?"act":""} onClick={()=>setTab(n.id)}><span style={{fontSize:18}}>{n.icon}</span>{n.label}</button>)}
+            <button className={configSubTabs.some(s=>s.id===tab)?"act":""} onClick={()=>setTab("contas")}><span style={{fontSize:18}}>⚙</span>Config</button>
           </div>
         )}
       </div>
