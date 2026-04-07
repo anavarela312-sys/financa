@@ -433,7 +433,11 @@ export default function App(){
   const [newSnap,setNewSnap]=useState("");
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
-  const [dismissedAlerts,setDismissedAlerts]=useState(new Set());
+  const [dismissedAlertsArr,setDismissedAlertsArr]=useLS("fin_dismissed_"+mesKey,[]);
+  const dismissedAlerts=useMemo(()=>new Set(dismissedAlertsArr),[dismissedAlertsArr]);
+  const dismissAlert=useCallback(cat=>{
+    setDismissedAlertsArr(prev=>[...new Set([...prev,cat])]);
+  },[setDismissedAlertsArr]);
   const [addManual,setAddManual]=useState(false);
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
   const [search,setSearch]=useState("");
@@ -1322,7 +1326,7 @@ export default function App(){
                   <p style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:6}}>⚠️ Alertas de orçamento</p>
                   {alerts.filter(a=>!dismissedAlerts.has(a.cat)).map(a=>(
                     <div key={a.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
-                      <input type="checkbox" onChange={()=>setDismissedAlerts(prev=>{const n=new Set(prev);n.add(a.cat);return n;})}
+                      <input type="checkbox" onChange={()=>dismissAlert(a.cat)}
                         style={{width:14,height:14,cursor:"pointer",accentColor:"#3b82f6",flexShrink:0}}/>
                       <div style={{flex:1,display:"flex",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setCatModal(a.cat)}>
                         <span style={{fontSize:12,color:"#94a3b8"}}>{cats[a.cat]?.icon} {a.cat}</span>
@@ -1345,26 +1349,29 @@ export default function App(){
               {/* Contas */}
               <Card>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Contas</p><button onClick={()=>setTab("contas")} style={{background:"none",border:"none",color:"#3b82f6",fontSize:12,cursor:"pointer"}}>Gerir →</button></div>
-                <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {CONTA_SECOES.map(sec=>{
                     const secContas=contas.filter(c=>c.secao===sec.id);
                     if(!secContas.length) return null;
                     const secTotal=secContas.reduce((a,c)=>a+c.saldo,0);
                     return(
-                      <div key={sec.id} style={{flexShrink:0}}>
-                        <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6,paddingLeft:2}}>{sec.icon} {sec.label}</p>
-                        <div style={{display:"flex",gap:6}}>
+                      <div key={sec.id}>
+                        {/* Section label + total */}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                          <span style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{sec.icon} {sec.label}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fE0(secTotal)}</span>
+                        </div>
+                        {/* Accounts in a horizontal scrollable row */}
+                        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
                           {secContas.map(c=>(
-                            <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 10px",minWidth:85}}>
-                              <p style={{fontSize:14,marginBottom:2}}>{c.icon}</p>
-                              <p style={{fontSize:10,color:"#64748b",marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:80}}>{c.nome}</p>
-                              <p style={{fontSize:12,fontWeight:600,color:"#fff"}}>{fE0(c.saldo)}</p>
+                            <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:90}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                                <span style={{fontSize:13}}>{c.icon}</span>
+                                <span style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:70}}>{c.nome}</span>
+                              </div>
+                              <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE0(c.saldo)}</p>
                             </div>
                           ))}
-                          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #1e3048",borderRadius:10,padding:"8px 10px",minWidth:70,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-                            <p style={{fontSize:9,color:"#64748b",marginBottom:1}}>Total</p>
-                            <p style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>{fE0(secTotal)}</p>
-                          </div>
                         </div>
                       </div>
                     );
