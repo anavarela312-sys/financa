@@ -210,7 +210,7 @@ function parseLines(text, cats) {
     const val = parseVal(mont); if (val===0) continue;
     const cr = tipo?.toLowerCase().includes("créd") || val > 0;
     const r = autoCat(desc, cats);
-    out.push({ id:crypto.randomUUID(), data:r?.d1?nextMonth(data):data, dataOrig:data, desc, val:Math.abs(val), tipo:cr?"c":"d", cat:r?.cat||"", sub:r?.sub||"", ent:r?.ent||"", nota:"", ok:!!r });
+    out.push({ id:crypto.randomUUID(), data:r?.d1?nextMonth(data):data, dataOrig:data, desc, val:Math.abs(val), tipo:cr?"c":"d", cat:r?.cat||"", sub:r?.sub||"", ent:r?.ent||"", nota:"", ok:!!r, contaId:"mill" });
   }
   return out.sort((a,b)=>b.data.localeCompare(a.data));
 }
@@ -508,6 +508,7 @@ export default function App(){
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
   const [search,setSearch]=useState("");
   const [searchVal,setSearchVal]=useState("");
+  const [contaFiltro,setContaFiltro]=useState("mill"); // selected account in transactions
   const [splitModal,setSplitModal]=useState(null); // transaction id to split
   const [splitParts,setSplitParts]=useState([]); // [{id, val, cat, sub, nota}]
   const [dateFrom,setDateFrom]=useState("");
@@ -543,20 +544,28 @@ export default function App(){
   const handleFile=f=>{if(!f)return;const r=new FileReader();r.onload=e=>processar(e.target.result);r.readAsText(f,"utf-8");};
   const isInt=t=>t.cat==="Transferência Interna"||t.cat==="Poupança";
 
-  const transMes=trans.filter(t=>{const[y,m]=t.data.split("-");return parseInt(m)-1===fMes&&parseInt(y)===fAno;});
+  const transMes=trans.filter(t=>{
+    const[y,m]=t.data.split("-");
+    const inMonth=parseInt(m)-1===fMes&&parseInt(y)===fAno;
+    if(!inMonth) return false;
+    // Filter by account: match contaId or contaOrigem
+    if(contaFiltro==="all") return true;
+    return (t.contaId||t.contaOrigem||"mill")===contaFiltro;
+  });
 
   // Running balance: sort by date, calculate saldo after each
   const transMesWithBalance = useMemo(()=>{
     const sorted=[...transMes].sort((a,b)=>a.data.localeCompare(b.data)||a.id.localeCompare(b.id));
-    // Use saldoInicial from Millennium account if set
-    const millConta = contas.find(c=>c.id==="mill");
-    // Calculate saldo at start of month from all transactions before this month
+    // Use saldoInicial from selected account
+    const selectedConta = contas.find(c=>c.id===contaFiltro);
     const transAntes = trans.filter(t=>{
       const [y,m]=t.data.split("-");
-      return parseInt(y)<fAno||(parseInt(y)===fAno&&parseInt(m)-1<fMes);
+      const beforeMonth=parseInt(y)<fAno||(parseInt(y)===fAno&&parseInt(m)-1<fMes);
+      const sameAccount=(t.contaId||t.contaOrigem||"mill")===contaFiltro;
+      return beforeMonth&&sameAccount;
     });
-    const saldoBase = millConta?.saldoInicial!=null
-      ? millConta.saldoInicial + transAntes.filter(t=>!isInt(t)).reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0)
+    const saldoBase = selectedConta?.saldoInicial!=null
+      ? selectedConta.saldoInicial + transAntes.filter(t=>!isInt(t)).reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0)
       : 0;
     let bal=saldoBase;
     return sorted.map(t=>{
@@ -669,7 +678,7 @@ export default function App(){
     const entFinal=ed.ent!==undefined?ed.ent:t.ent;
     if(ed.newCatName){const c={...cats};c[ed.newCatName]={icon:ed.newCatIcon||"📌",color:ed.newCatColor||"#3b82f6",subs:ed.newCatSub?[ed.newCatSub]:[]};setCats(c);}
     if(catFinal&&ed.newSubName&&cats[catFinal]){const c={...cats};c[catFinal]={...c[catFinal],subs:[...c[catFinal].subs,ed.newSubName]};setCats(c);}
-    const finalTrans={...t,cat:catFinal,sub:subFinal,ent:entFinal,data:ed.data||t.data,nota:ed.nota||t.nota||"",ok:true,contaOrigem:ed.contaOrigem||"",contaDestino:ed.contaDestino||""};
+    const finalTrans={...t,cat:catFinal,sub:subFinal,ent:entFinal,data:ed.data||t.data,nota:ed.nota||t.nota||"",ok:true,contaOrigem:ed.contaOrigem||"",contaDestino:ed.contaDestino||"",contaId:t.contaId||ed.contaOrigem||"mill"};
     setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return ids.has(finalTrans.desc+finalTrans.data+finalTrans.val)?prev:[...prev,finalTrans];});
     applyBalance(catFinal, t.val, t.tipo, ed.contaOrigem, ed.contaDestino);
     const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");
@@ -2295,7 +2304,22 @@ export default function App(){
           {/* TRANSAÇÕES */}
           {tab==="transacoes"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Transações</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>{transMes.length} movimentos · {MESES[fMes]} {fAno}</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Transações</p></>}
+
+              {/* Account selector */}
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,marginBottom:12}}>
+                <button onClick={()=>setContaFiltro("all")}
+                  style={{padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:500,border:"1px solid",borderColor:contaFiltro==="all"?"#3b82f6":"#1e3048",background:contaFiltro==="all"?"rgba(59,130,246,0.15)":"transparent",color:contaFiltro==="all"?"#3b82f6":"#64748b",flexShrink:0,cursor:"pointer"}}>
+                  Todas
+                </button>
+                {contas.map(c=>(
+                  <button key={c.id} onClick={()=>setContaFiltro(c.id)}
+                    style={{padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:500,border:"1px solid",borderColor:contaFiltro===c.id?c.cor:"#1e3048",background:contaFiltro===c.id?c.cor+"22":"transparent",color:contaFiltro===c.id?c.cor:"#64748b",flexShrink:0,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    {c.icon} {c.nome}
+                  </button>
+                ))}
+              </div>
+              <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{transMes.length} movimentos · {MESES[fMes]} {fAno} {contaFiltro!=="all"?`· ${contas.find(c=>c.id===contaFiltro)?.nome}`:""}</p>
 
               {/* Add manual transaction */}
               <div style={{marginBottom:12}}>
@@ -2346,7 +2370,7 @@ export default function App(){
                     <button onClick={()=>{
                       const val=parseFloat(manualT.val);
                       if(!val||!manualT.desc){alert("Preenche pelo menos a descrição e o valor.");return;}
-                      const t={id:crypto.randomUUID(),data:manualT.data,dataOrig:manualT.data,desc:manualT.desc,val:Math.abs(val),tipo:manualT.tipo,cat:manualT.cat,sub:manualT.sub,ent:manualT.ent||manualT.desc,nota:manualT.nota,ok:true,contaOrigem:manualT.contaOrigem,contaDestino:manualT.contaDestino};
+                      const t={id:crypto.randomUUID(),data:manualT.data,dataOrig:manualT.data,desc:manualT.desc,val:Math.abs(val),tipo:manualT.tipo,cat:manualT.cat,sub:manualT.sub,ent:manualT.ent||manualT.desc,nota:manualT.nota,ok:true,contaOrigem:manualT.contaOrigem,contaDestino:manualT.contaDestino,contaId:manualT.contaOrigem||contaFiltro};
                       setTrans(prev=>[...prev,t]);
                       applyBalance(manualT.cat,Math.abs(val),manualT.tipo,manualT.contaOrigem,manualT.contaDestino);
                       setManualT({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
