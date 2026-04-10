@@ -453,6 +453,7 @@ export default function App(){
   const [cats,setCats,forceCats]=useLS("fin_cats_v6",DEFAULT_CATS);
 
   const [patSnaps,setPatSnaps]=useLS("fin_pat_v1",[]);
+  const [empTab,setEmpTab]=useState("mensal");
   const [empData,setEmpData]=useLS("fin_emp_v1",{
     diasTrabalhados:{}, // mesKey -> dias reais
     despesasReais:{},   // mesKey -> {id: valor_real}
@@ -1047,8 +1048,8 @@ export default function App(){
     EMP_DESPESAS_PONTUAIS.forEach(d => {
       if(d.meses.includes(fMes)) despMes[d.id] = empData.despesasReais?.[empMesKey]?.[d.id] ?? d.valor;
     });
-    // Subsidio extra
-    const subsidioExtra = isSubsidio ? (despMes["salario"]||0) + (despMes["tsu"]||0)*0.5 : 0;
+    // Subsidio extra: salário + TSU completa + retenção IRS (Cover Flex não duplica)
+    const subsidioExtra = isSubsidio ? (despMes["salario"]||0) + (despMes["tsu"]||0) + (despMes["irs_ret"]||0) : 0;
     const totalDespesas = Object.values(despMes).reduce((a,b)=>a+b,0) + subsidioExtra;
     const resultado = receitaBruta - totalDespesas;
 
@@ -1064,7 +1065,8 @@ export default function App(){
       if(EMP_MESES_SUBSIDIO.includes(m)) {
         const sal = empData.despesasReais?.[mk]?.salario ?? 1000;
         const tsu = empData.despesasReais?.[mk]?.tsu ?? 347.50;
-        desp += sal + tsu * 0.5;
+        const irs = empData.despesasReais?.[mk]?.irs_ret ?? 14;
+        desp += sal + tsu + irs;
       }
       return { mes:m, mk, rec, desp, res:rec-desp, iva:rec*0.23 };
     });
@@ -1099,13 +1101,23 @@ export default function App(){
         <style>{CSS}</style>
         <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
           {/* Header */}
-          <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
+          <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:8,position:"sticky",top:0,zIndex:50,flexWrap:"wrap"}}>
             <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
             <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>🏢 Linguagem Entusiasta</p>
-            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+            {/* Tabs */}
+            <div style={{display:"flex",gap:0,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:3,marginLeft:"auto"}}>
+              {[{id:"mensal",label:"📅 Mensal"},{id:"anual",label:"📈 Anual"}].map(t=>(
+                <button key={t.id} onClick={()=>setEmpTab(t.id)}
+                  style={{padding:"5px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:empTab===t.id?"rgba(245,158,11,0.3)":"none",color:empTab===t.id?"#fff":"#64748b",border:"none",cursor:"pointer"}}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {empTab==="mensal"&&<div style={{display:"flex",gap:6}}>
               <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{fontSize:12,padding:"5px 8px",width:"auto"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
               <select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{fontSize:12,padding:"5px 8px",width:"auto"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
-            </div>
+            </div>}
+            {empTab==="anual"&&<select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{fontSize:12,padding:"5px 8px",width:"auto"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>}
           </div>
 
           <div style={{padding:mainPad,maxWidth:isMobile?undefined:1000,margin:"0 auto"}} className="fade">
@@ -1299,6 +1311,10 @@ export default function App(){
                 </tbody>
               </table>
             </Card>
+
+            </div>
+            {/* ── TAB ANUAL ── */}
+            <div style={{display:empTab==="anual"?"block":"none"}}>
 
             {/* Annual overview */}
             <Card>
