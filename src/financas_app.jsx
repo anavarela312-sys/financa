@@ -2331,49 +2331,87 @@ export default function App(){
                 {(search||dateFrom||dateTo||searchVal)&&<button onClick={()=>{setSearch("");setDateFrom("");setDateTo("");setSearchVal("");}} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"6px",fontSize:12,borderRadius:8}}>✕ Limpar filtros</button>}
               </div>
               {!filteredTrans.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Sem transações.</p></Card>}
-              {filteredTrans.map(t=>(
-                <div key={t.id}>
-                  {editId===t.id?(
-                    <Card>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-                        <div><Lbl>Data</Lbl><input type="date" value={editD.data} onChange={e=>setEditD(d=>({...d,data:e.target.value}))}/></div>
-                        <div><Lbl>Entidade</Lbl><input type="text" value={editD.ent} onChange={e=>setEditD(d=>({...d,ent:e.target.value}))}/></div>
-                        <div><Lbl>Categoria</Lbl><select value={editD.cat} onChange={e=>setEditD(d=>({...d,cat:e.target.value,sub:""}))}>
-                          {Object.keys(cats).map(c=><option key={c} value={c}>{c}</option>)}
-                        </select></div>
-                        <div><Lbl>Subcategoria</Lbl><select value={editD.sub} onChange={e=>setEditD(d=>({...d,sub:e.target.value}))}>
-                          <option value="">—</option>{(cats[editD.cat]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
-                        </select></div>
-                      </div>
-                      <div style={{marginBottom:8}}><Lbl>Nota</Lbl><input type="text" value={editD.nota||""} placeholder="Nota opcional..." onChange={e=>setEditD(d=>({...d,nota:e.target.value}))}/></div>
-                      <div style={{display:"flex",gap:8}}>
-                        <Btn variant="primary" onClick={()=>saveEdit(t.id)} full>Guardar</Btn>
-                        <Btn onClick={()=>setEditId(null)}>Cancelar</Btn>
-                        <Btn variant="danger" onClick={()=>delT(t.id)}>×</Btn>
-                      </div>
-                    </Card>
-                  ):(
-                    <div style={{padding:"10px 0",borderBottom:"1px solid #0d1a2e"}} onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||""});}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3}}>
-                        <div style={{flex:1,minWidth:0,marginRight:8}}>
-                          <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
-                          <p style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
+              {(()=>{
+                // Group by day — style Boonzi
+                const byDay = [];
+                let currentDay = null;
+                filteredTrans.forEach(t=>{
+                  const day = t.data;
+                  if(day !== currentDay){
+                    currentDay = day;
+                    byDay.push({day, trans:[]});
+                  }
+                  byDay[byDay.length-1].trans.push(t);
+                });
+                return byDay.map(({day, trans:dayTrans})=>{
+                  // Saldo do fim do dia = saldoApos do último movimento do dia
+                  const saldoDia = dayTrans[dayTrans.length-1]?.saldoApos;
+                  const [ano,mes,dia] = day.split("-");
+                  const label = `${dia} ${MESES[parseInt(mes)-1]} ${ano}`;
+                  // Total entradas e saídas do dia
+                  const entDia = dayTrans.filter(t=>t.tipo==="c"&&!isInt(t)).reduce((a,t)=>a+t.val,0);
+                  const saiDia = dayTrans.filter(t=>t.tipo==="d"&&!isInt(t)).reduce((a,t)=>a+t.val,0);
+                  return(
+                    <div key={day} style={{marginBottom:4}}>
+                      {/* Day header */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#0a1220",borderRadius:10,marginBottom:2,position:"sticky",top:0,zIndex:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{label}</span>
+                          <div style={{display:"flex",gap:6}}>
+                            {entDia>0&&<span style={{fontSize:10,color:"#22c55e"}}>+{fE0(entDia)}</span>}
+                            {saiDia>0&&<span style={{fontSize:10,color:"#ef4444"}}>-{fE0(saiDia)}</span>}
+                          </div>
                         </div>
-                        <div style={{textAlign:"right",flexShrink:0}}>
-                          <p style={{fontSize:14,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?"#64748b":"#e2e8f0"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
-                          <p style={{fontSize:10,color:"#64748b"}}>saldo {fE(t.saldoApos)}</p>
-                        </div>
+                        <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>{fE(saldoDia)}</span>
                       </div>
-                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                        <span style={{fontSize:10,color:"#64748b"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
-                        {t.cat&&<Chip label={`${cats[t.cat]?.icon||""} ${t.cat}`} color={cats[t.cat]?.color||"#64748b"} sm/>}
-                        {t.sub&&<span style={{fontSize:10,color:"#94a3b8"}}>· {t.sub}</span>}
-                        {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝 {t.nota}</span>}
+                      {/* Day transactions */}
+                      <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:10,overflow:"hidden"}}>
+                        {dayTrans.map((t,i)=>(
+                          <div key={t.id} style={{borderBottom:i<dayTrans.length-1?"1px solid #0a1220":"none"}}>
+                            {editId===t.id?(
+                              <div style={{padding:14}}>
+                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                                  <div><Lbl>Data</Lbl><input type="date" value={editD.data} onChange={e=>setEditD(d=>({...d,data:e.target.value}))}/></div>
+                                  <div><Lbl>Entidade</Lbl><input type="text" value={editD.ent} onChange={e=>setEditD(d=>({...d,ent:e.target.value}))}/></div>
+                                  <div><Lbl>Categoria</Lbl><select value={editD.cat} onChange={e=>setEditD(d=>({...d,cat:e.target.value,sub:""}))}>
+                                    {Object.keys(cats).map(c=><option key={c} value={c}>{c}</option>)}
+                                  </select></div>
+                                  <div><Lbl>Subcategoria</Lbl><select value={editD.sub} onChange={e=>setEditD(d=>({...d,sub:e.target.value}))}>
+                                    <option value="">—</option>{(cats[editD.cat]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                                  </select></div>
+                                </div>
+                                <div style={{marginBottom:8}}><Lbl>Nota</Lbl><input type="text" value={editD.nota||""} placeholder="Nota opcional..." onChange={e=>setEditD(d=>({...d,nota:e.target.value}))}/></div>
+                                <div style={{display:"flex",gap:8}}>
+                                  <Btn variant="primary" onClick={()=>saveEdit(t.id)} full>Guardar</Btn>
+                                  <Btn onClick={()=>setEditId(null)}>Cancelar</Btn>
+                                  <Btn variant="danger" onClick={()=>delT(t.id)}>×</Btn>
+                                </div>
+                              </div>
+                            ):(
+                              <div style={{padding:"10px 14px",cursor:"pointer"}} className="hrow"
+                                onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||""});}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3}}>
+                                  <div style={{flex:1,minWidth:0,marginRight:8}}>
+                                    <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
+                                    {t.cat&&<div style={{display:"flex",gap:5,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
+                                      <Chip label={`${cats[t.cat]?.icon||""} ${t.cat}`} color={cats[t.cat]?.color||"#64748b"} sm/>
+                                      {t.sub&&<span style={{fontSize:10,color:"#94a3b8"}}>· {t.sub}</span>}
+                                      {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝 {t.nota}</span>}
+                                    </div>}
+                                  </div>
+                                  <div style={{textAlign:"right",flexShrink:0}}>
+                                    <p style={{fontSize:14,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?"#64748b":"#e2e8f0"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                });
+              })()}
             </div>
           )}
 
