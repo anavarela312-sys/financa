@@ -396,6 +396,8 @@ button:active{transform:scale(0.97)}
 .tabbar{position:fixed;bottom:0;left:0;right:0;background:#0a1220;border-top:1px solid #1e3048;display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
 .tabbar button{flex:1;padding:10px 2px;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;color:#64748b;font-size:10px;font-weight:500}
 .tabbar button.act{color:#3b82f6}
+.catrow{transition:background 0.12s}
+.catrow:hover{background:rgba(59,130,246,0.10) !important}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:flex-end;justify-content:center}
 .modal{background:#0d1a2e;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto}
 @media(min-width:640px){.modal-bg{align-items:center}.modal{border-radius:20px;max-height:80vh}}
@@ -506,6 +508,8 @@ export default function App(){
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
   const [search,setSearch]=useState("");
   const [searchVal,setSearchVal]=useState("");
+  const [splitModal,setSplitModal]=useState(null); // transaction id to split
+  const [splitParts,setSplitParts]=useState([]); // [{id, val, cat, sub, nota}]
   const [dateFrom,setDateFrom]=useState("");
   const [dateTo,setDateTo]=useState("");
   const [catModal,setCatModal]=useState(null); // cat name to show transactions
@@ -544,12 +548,22 @@ export default function App(){
   // Running balance: sort by date, calculate saldo after each
   const transMesWithBalance = useMemo(()=>{
     const sorted=[...transMes].sort((a,b)=>a.data.localeCompare(b.data)||a.id.localeCompare(b.id));
-    let bal=0;
+    // Use saldoInicial from Millennium account if set
+    const millConta = contas.find(c=>c.id==="mill");
+    // Calculate saldo at start of month from all transactions before this month
+    const transAntes = trans.filter(t=>{
+      const [y,m]=t.data.split("-");
+      return parseInt(y)<fAno||(parseInt(y)===fAno&&parseInt(m)-1<fMes);
+    });
+    const saldoBase = millConta?.saldoInicial!=null
+      ? millConta.saldoInicial + transAntes.filter(t=>!isInt(t)).reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0)
+      : 0;
+    let bal=saldoBase;
     return sorted.map(t=>{
       if(!isInt(t)) bal+=(t.tipo==="c"?t.val:-t.val);
       return{...t,saldoApos:bal};
     }).reverse();
-  },[transMes]);
+  },[transMes,trans,contas,fMes,fAno]);
 
   const desp=transMes.filter(t=>t.tipo==="d"&&!isInt(t));
   const rec=transMes.filter(t=>t.tipo==="c"&&!isInt(t));
@@ -691,7 +705,15 @@ export default function App(){
   };
 
   // Cat transactions modal
-  const catTransactions=catModal?transMes.filter(t=>t.cat===catModal):[];
+  const catTransactions=catModal?(()=>{
+    if(catModal.includes("::")){
+      const [cat,sub]=catModal.split("::");
+      return transMes.filter(t=>t.cat===cat&&t.sub===sub);
+    }
+    return transMes.filter(t=>t.cat===catModal);
+  })():[];
+  const catModalLabel=catModal?.includes("::")?catModal.split("::")[1]:catModal;
+  const catModalCat=catModal?.includes("::")?catModal.split("::")[0]:catModal;
 
   const px=isMobile?"14px":"24px";
   const mainPad=isMobile?"14px 14px 80px":"24px 28px";
@@ -2388,9 +2410,9 @@ export default function App(){
                                 </div>
                               </div>
                             ):(
-                              <div style={{padding:"10px 14px",cursor:"pointer"}} className="hrow"
-                                onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||""});}}>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3}}>
+                              <div style={{padding:"10px 14px"}} className="hrow">
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3,cursor:"pointer"}}
+                                  onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||""});}}>
                                   <div style={{flex:1,minWidth:0,marginRight:8}}>
                                     <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
                                     {t.cat&&<div style={{display:"flex",gap:5,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
@@ -2398,8 +2420,11 @@ export default function App(){
                                       {t.sub&&<span style={{fontSize:10,color:"#94a3b8"}}>· {t.sub}</span>}
                                       {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝 {t.nota}</span>}
                                     </div>}
+                                    {t.splits?.length>0&&<span style={{fontSize:10,color:"#a855f7"}}>✂ dividido em {t.splits.length} partes</span>}
                                   </div>
-                                  <div style={{textAlign:"right",flexShrink:0}}>
+                                  <div style={{textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:8}}>
+                                    <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}}
+                                      style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"3px 7px",fontSize:10,cursor:"pointer"}}>✂</button>
                                     <p style={{fontSize:14,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?"#64748b":"#e2e8f0"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
                                   </div>
                                 </div>
@@ -2434,12 +2459,12 @@ export default function App(){
                   }}>✓✓ Confirmar todos ({pend.length})</Btn>
                 </div>
               )}
-              {/* Lista compacta estilo Boonzi */}
+              {/* Lista compacta — novo layout centrado */}
               <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:16,overflow:"hidden"}}>
                 {/* Header */}
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 1fr 180px 160px 100px",gap:8,padding:"10px 16px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
-                  {["Data","Descrição / Entidade",isMobile?"":"Categoria",isMobile?"":"Subcategoria","Valor"].filter(Boolean).map(h=>(
-                    <span key={h} style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
+                <div style={{display:"grid",gridTemplateColumns:"90px 1fr 200px 170px 90px 32px",gap:8,padding:"10px 16px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
+                  {["Data","Descrição","Categoria","Subcategoria","Valor",""].map((h,i)=>(
+                    <span key={i} style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
                   ))}
                 </div>
                 {pend.map(t=>{
@@ -2449,38 +2474,33 @@ export default function App(){
                   const entA=ed.ent!==undefined?ed.ent:t.ent;
                   const isExpanded=ed.expanded;
                   const isPrefilled=t.ok&&!isExpanded;
+                  const bgRow = !t.ok?"rgba(239,68,68,0.06)":isPrefilled?"transparent":"rgba(59,130,246,0.04)";
                   return(
                     <div key={t.id} style={{borderBottom:"1px solid #0a1220"}}>
                       {/* Compact row */}
-                      <div style={{display:"grid",gridTemplateColumns:isMobile?"90px 1fr 90px":"100px 1fr 180px 160px 100px",gap:8,padding:"9px 16px",alignItems:"center",background:!t.ok?"rgba(239,68,68,0.06)":isPrefilled?"transparent":"rgba(59,130,246,0.04)",cursor:"pointer"}}
+                      <div className="catrow" style={{display:"grid",gridTemplateColumns:"90px 1fr 200px 170px 90px 32px",gap:8,padding:"10px 16px",alignItems:"center",background:bgRow,cursor:"pointer"}}
                         onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],expanded:!isExpanded}}))}>
-                        <span style={{fontSize:11,color:"#64748b",fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
+                        <span style={{fontSize:12,color:"#64748b",fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
                         <div style={{minWidth:0}}>
-                          <p style={{fontSize:12,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.ok?"#e2e8f0":"#94a3b8"}}>{entA||t.desc}</p>
-                          <p style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
+                          <p style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.ok?"#e2e8f0":"#94a3b8"}}>{entA||t.desc}</p>
+                          <p style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
                         </div>
-                        {!isMobile&&(
-                          <>
-                            <div onClick={e=>e.stopPropagation()}>
-                              <select value={catA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],cat:e.target.value,sub:""}}))}
-                                style={{fontSize:11,padding:"4px 6px",background:!catA?"rgba(239,68,68,0.1)":"#0f1d2e",borderColor:!catA?"rgba(239,68,68,0.4)":"#1e3048"}}>
-                                <option value="">-- categorizar --</option>
-                                {Object.keys(cats).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
-                              </select>
-                            </div>
-                            <div onClick={e=>e.stopPropagation()}>
-                              <select value={subA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],sub:e.target.value}}))}
-                                style={{fontSize:11,padding:"4px 6px"}}>
-                                <option value="">—</option>
-                                {(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
-                              </select>
-                            </div>
-                          </>
-                        )}
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:4}}>
-                          <span style={{fontSize:12,fontWeight:600,color:t.tipo==="c"?"#22c55e":"#e2e8f0",whiteSpace:"nowrap"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
-                          <span style={{fontSize:10,color:"#64748b"}}>{isExpanded?"▲":"▼"}</span>
+                        <div onClick={e=>e.stopPropagation()}>
+                          <select value={catA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],cat:e.target.value,sub:""}}))}
+                            style={{fontSize:12,padding:"5px 8px",width:"100%",background:!catA?"rgba(239,68,68,0.1)":"#0f1d2e",borderColor:!catA?"rgba(239,68,68,0.4)":"#1e3048"}}>
+                            <option value="">-- categorizar --</option>
+                            {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
+                          </select>
                         </div>
+                        <div onClick={e=>e.stopPropagation()}>
+                          <select value={subA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],sub:e.target.value}}))}
+                            style={{fontSize:12,padding:"5px 8px",width:"100%"}}>
+                            <option value="">—</option>
+                            {(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <span style={{fontSize:13,fontWeight:700,color:t.tipo==="c"?"#22c55e":"#e2e8f0",whiteSpace:"nowrap",textAlign:"right"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
+                        <span style={{fontSize:12,color:"#64748b",textAlign:"center"}}>{isExpanded?"▲":"▼"}</span>
                       </div>
                       {/* Expanded detail */}
                       {isExpanded&&(
@@ -2543,9 +2563,23 @@ export default function App(){
           {tab==="contas"&&(
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:10}}>Atualiza os saldos</p></>}
-              <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:14}}>
+              <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:10}}>
                 ＋ Adicionar movimento manual
               </button>
+              <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:14}}>
+                <p style={{fontSize:11,color:"#f59e0b",marginBottom:6}}>💡 Saldo inicial para cálculo correcto</p>
+                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Define o saldo da conta no início do período importado para o saldo nos movimentos bater certo com o extrato.</p>
+                {contas.filter(c=>c.secao==="corrente").map(c=>(
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                    <span style={{fontSize:13}}>{c.icon}</span>
+                    <span style={{fontSize:12,color:"#e2e8f0",flex:1}}>{c.nome}</span>
+                    <input type="number" step="0.01"
+                      value={c.saldoInicial??""} placeholder="Saldo inicial..."
+                      onChange={e=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldoInicial:parseFloat(e.target.value)||0}:x))}
+                      style={{width:110,fontSize:12,textAlign:"right",padding:"4px 8px"}}/>
+                  </div>
+                ))}
+              </div>
               {contas.map(c=>(
                 <div key={c.id} style={{background:"#0d1a2e",border:`1px solid ${c.cor}44`,borderRadius:14,padding:16,marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -2637,7 +2671,8 @@ export default function App(){
       {/* MODAL: transações de uma categoria */}
       {catModal&&(
         <Modal onClose={()=>setCatModal(null)}>
-          <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:4}}>{cats[catModal]?.icon} {catModal}</p>
+          <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:4}}>{cats[catModalCat]?.icon} {catModalLabel}</p>
+          {catModal?.includes("::")&&<p style={{fontSize:11,color:"#64748b",marginBottom:4}}>{cats[catModalCat]?.icon} {catModalCat}</p>}
           <p style={{fontSize:12,color:"#64748b",marginBottom:14}}>{catTransactions.length} movimentos · {MESES[fMes]} {fAno}</p>
           {catTransactions.length===0&&<p style={{color:"#64748b",fontSize:13}}>Sem movimentos nesta categoria.</p>}
           {catTransactions.map(t=>(
@@ -2662,6 +2697,73 @@ export default function App(){
       )}
 
       {/* MODAL: nova categoria */}
+      {/* SPLIT MODAL */}
+      {splitModal&&(()=>{
+        const t=trans.find(x=>x.id===splitModal);
+        if(!t) return null;
+        const total=splitParts.reduce((a,p)=>a+(parseFloat(p.val)||0),0);
+        const diff=Math.abs(t.val-total);
+        const ok=diff<0.01;
+        return(
+          <Modal onClose={()=>setSplitModal(null)}>
+            <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:4}}>✂ Dividir movimento</p>
+            <p style={{fontSize:12,color:"#64748b",marginBottom:6}}>{t.ent||t.desc} · {fE(t.val)}</p>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:12,padding:"6px 10px",background:ok?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:8}}>
+              <span style={{fontSize:12,color:ok?"#22c55e":"#ef4444"}}>Total partes: {fE(total)}</span>
+              {!ok&&<span style={{fontSize:12,color:"#ef4444"}}>Falta: {fE(t.val-total)}</span>}
+              {ok&&<span style={{fontSize:12,color:"#22c55e"}}>✓ Bate certo</span>}
+            </div>
+            {splitParts.map((p,i)=>(
+              <div key={p.id} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px",marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#a855f7"}}>Parte {i+1}</span>
+                  {splitParts.length>1&&<button onClick={()=>setSplitParts(prev=>prev.filter((_,j)=>j!==i))}
+                    style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",borderRadius:6,padding:"2px 8px",fontSize:12}}>×</button>}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div><Lbl>Valor (€)</Lbl>
+                    <input type="number" value={p.val} step="0.01"
+                      onChange={e=>setSplitParts(prev=>prev.map((x,j)=>j===i?{...x,val:e.target.value}:x))}
+                      style={{fontSize:13}}/>
+                  </div>
+                  <div><Lbl>Categoria</Lbl>
+                    <select value={p.cat} onChange={e=>setSplitParts(prev=>prev.map((x,j)=>j===i?{...x,cat:e.target.value,sub:""}:x))}
+                      style={{fontSize:12}}>
+                      <option value="">Selecionar...</option>
+                      {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
+                    </select>
+                  </div>
+                  <div><Lbl>Subcategoria</Lbl>
+                    <select value={p.sub} onChange={e=>setSplitParts(prev=>prev.map((x,j)=>j===i?{...x,sub:e.target.value}:x))}
+                      style={{fontSize:12}}>
+                      <option value="">—</option>
+                      {(cats[p.cat]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div><Lbl>Nota</Lbl>
+                    <input type="text" value={p.nota} placeholder="Opcional..."
+                      onChange={e=>setSplitParts(prev=>prev.map((x,j)=>j===i?{...x,nota:e.target.value}:x))}
+                      style={{fontSize:12}}/>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button onClick={()=>setSplitParts(prev=>[...prev,{id:crypto.randomUUID(),val:0,cat:"",sub:"",nota:""}])}
+              style={{width:"100%",background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"1px dashed rgba(168,85,247,0.3)",borderRadius:8,padding:"8px",fontSize:13,marginBottom:12}}>
+              + Adicionar parte
+            </button>
+            <div style={{display:"flex",gap:8}}>
+              <Btn variant="primary" full onClick={()=>{
+                if(!ok){alert("O total das partes tem de ser igual ao valor do movimento.");return;}
+                setTrans(prev=>prev.map(x=>x.id===splitModal?{...x,splits:splitParts,cat:splitParts[0].cat,sub:splitParts[0].sub,nota:splitParts[0].nota}:x));
+                setSplitModal(null);
+              }}>✓ Guardar divisão</Btn>
+              <Btn onClick={()=>setSplitModal(null)}>Cancelar</Btn>
+            </div>
+          </Modal>
+        );
+      })()}
+
       {newCatModal&&(
         <Modal onClose={()=>setNewCatModal(false)}>
           <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:16}}>Nova categoria</p>
