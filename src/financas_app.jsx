@@ -2242,22 +2242,38 @@ export default function App(){
                       {/* Subcategories with orçamento detail */}
                       {(Object.entries(d.subs||{}).filter(([,v])=>v>0).length>0||orcEdit)&&(
                         <div style={{marginTop:4}}>
-                          {/* Real spending per sub */}
-                          {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>a[0].localeCompare(b[0],"pt")).map(([sub,val])=>(
-                            <div key={sub} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0 3px 30px"}}>
-                              <span style={{fontSize:11,color:"#64748b"}}>{sub||"Sem subcategoria"}</span>
-                              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                                <span style={{fontSize:11,color:"#94a3b8"}}>{fE0(val)}</span>
+                          {/* Sub spending with bars + click */}
+                          {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>a[0].localeCompare(b[0],"pt")).map(([sub,val])=>{
+                            const subOrcKey=`${cat}::${sub}`;
+                            const subOrc=orcMes[subOrcKey]||0;
+                            const subPct=subOrc>0?val/subOrc*100:0;
+                            const subOver=subOrc>0&&val>subOrc;
+                            const subColor=subOver?"#ef4444":subPct>=75?"#f59e0b":"#22c55e";
+                            return(
+                              <div key={sub} style={{padding:"4px 0 4px 30px",cursor:"pointer"}}
+                                onClick={e=>{e.stopPropagation();setCatModal(cat+"::"+sub);}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                                  <span style={{fontSize:11,color:"#94a3b8"}}>{sub||"Sem subcategoria"}</span>
+                                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":"#e2e8f0"}}>{fE0(val)}</span>
+                                    {orcEdit?(
+                                      <input type="number" defaultValue={subOrc||""} placeholder="0"
+                                        onClick={e=>e.stopPropagation()}
+                                        style={{width:65,textAlign:"right",padding:"2px 6px",fontSize:11}}
+                                        onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[subOrcKey]:v}}));}}/>
+                                    ):(subOrc>0&&<span style={{fontSize:10,color:"#64748b"}}>/{fE0(subOrc)}</span>)}
+                                  </div>
+                                </div>
+                                {subOrc>0&&<PBar val={val} max={subOrc} color={subColor} h={3}/>}
                               </div>
-                            </div>
-                          ))}
-                          {/* Sub-budget inputs when editing */}
-                          {orcEdit&&[...(cats[cat]?.subs||[])].sort((a,b)=>a.localeCompare(b,"pt")).map(sub=>{
+                            );
+                          })}
+                          {orcEdit&&[...(cats[cat]?.subs||[])].sort((a,b)=>a.localeCompare(b,"pt")).filter(sub=>!(d.subs?.[sub]>0)).map(sub=>{
                             const subOrcKey=`${cat}::${sub}`;
                             const subOrc=orcMes[subOrcKey]||0;
                             return(
                               <div key={sub} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0 3px 30px"}}>
-                                <span style={{fontSize:11,color:"#64748b"}}>{sub}</span>
+                                <span style={{fontSize:11,color:"#475569"}}>{sub} <span style={{fontSize:9}}>(0€)</span></span>
                                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                                   <span style={{fontSize:10,color:"#64748b"}}>orç.</span>
                                   <input type="number" defaultValue={subOrc||""} placeholder="0"
