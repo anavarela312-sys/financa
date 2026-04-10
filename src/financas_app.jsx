@@ -771,18 +771,45 @@ export default function App(){
           </div>
         </div>
         <div style={{width:"100%",maxWidth:480}}>
-          {/* Empresa WIP card */}
-          <div style={{background:"#0d1a2e",border:"1px dashed #1e3048",borderRadius:18,padding:20,marginBottom:12,opacity:0.7}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:24,width:44,height:44,background:"rgba(245,158,11,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🏢</div>
+          {/* Empresa card */}
+          <div onClick={()=>setScreen("empresa")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,marginBottom:12,cursor:"pointer",transition:"all 0.2s"}}
+            onMouseEnter={e=>{if(!isMobile){e.currentTarget.style.borderColor="#f59e0b";e.currentTarget.style.transform="translateY(-3px)";}}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3048";e.currentTarget.style.transform="translateY(0)";}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+              <div style={{fontSize:24,width:44,height:44,background:"rgba(245,158,11,0.1)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🏢</div>
               <div style={{flex:1}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
-                  <h2 style={{fontSize:16,fontWeight:600,color:"#fff"}}>Empresa</h2>
-                  <span style={{fontSize:10,background:"rgba(245,158,11,0.15)",color:"#f59e0b",padding:"2px 8px",borderRadius:20,fontWeight:600}}>em breve</span>
-                </div>
-                <p style={{fontSize:12,color:"#64748b"}}>Linguagem Entusiasta · Gestão financeira</p>
+                <h2 style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:2}}>Linguagem Entusiasta</h2>
+                <p style={{fontSize:12,color:"#64748b"}}>P&L · Fiscal · Projeção Anual</p>
               </div>
+              <span style={{color:"#f59e0b",fontSize:18}}>›</span>
             </div>
+            {(()=>{
+              const mk=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`;
+              const dias=empData?.diasTrabalhados?.[mk]??EMP_DIAS_UTEIS_BASE[mk]??20;
+              const rec=dias*EMP_TAXA_DIARIA;
+              const desp=EMP_DESPESAS_FIXAS.reduce((a,d)=>a+(empData?.despesasReais?.[mk]?.[d.id]??d.valor),0);
+              const res=rec-desp;
+              const hoje=new Date();
+              const proxObrig=EMP_OBRIGACOES.filter(o=>new Date(o.data)>=hoje).sort((a,b)=>new Date(a.data)-new Date(b.data))[0];
+              const diasObrig=proxObrig?Math.ceil((new Date(proxObrig.data)-hoje)/(1000*60*60*24)):null;
+              return(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  <div style={{background:"rgba(34,197,94,0.08)",borderRadius:10,padding:"8px 12px"}}>
+                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Receita {MESES[new Date().getMonth()]}</p>
+                    <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE0(rec)}</p>
+                  </div>
+                  <div style={{background:res>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}>
+                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Resultado</p>
+                    <p style={{fontSize:14,fontWeight:600,color:res>=0?"#22c55e":"#ef4444"}}>{fE0(res)}</p>
+                  </div>
+                  <div style={{background:"rgba(245,158,11,0.08)",borderRadius:10,padding:"8px 12px"}}>
+                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Próx. Obrigação</p>
+                    <p style={{fontSize:12,fontWeight:600,color:"#f59e0b"}}>{proxObrig?`${diasObrig}d`:"—"}</p>
+                    {proxObrig&&<p style={{fontSize:9,color:"#64748b"}}>{proxObrig.label}</p>}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"12px 16px",textAlign:"center",marginBottom:10}}>
