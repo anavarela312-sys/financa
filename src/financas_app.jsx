@@ -313,6 +313,52 @@ const GRUPOS_ATIVOS = [
   { id:"liquidez",     label:"Liquidez",      icon:"💰", color:"#22c55e" },
 ];
 
+
+// ── EMPRESA ───────────────────────────────────────────────────
+const EMP_TAXA_DIARIA = 200.85;
+
+const EMP_DESPESAS_FIXAS = [
+  { id:"tsu",        label:"TSU / Segurança Social",     valor:347.50, icon:"🏛️",  cat:"rh" },
+  { id:"leasing",    label:"Leasing CA Auto Bank",        valor:416.31, icon:"🚗",  cat:"fixo", nota:"Até Ago 2027" },
+  { id:"inelconta",  label:"Inelconta (Contabilidade)",   valor:196.80, icon:"📊",  cat:"fixo" },
+  { id:"cvfx_ref",   label:"Cover Flex — Refeição",       valor:200.00, icon:"🍽️", cat:"rh" },
+  { id:"cvfx_inf",   label:"Cover Flex — Cheque Infância",valor:450.00, icon:"👧",  cat:"rh" },
+  { id:"fidelidade", label:"Fidelidade — Seguro Saúde",   valor:135.47, icon:"🏥",  cat:"fixo" },
+  { id:"salario",    label:"Salário João (líquido)",       valor:1000.00,icon:"👤",  cat:"rh" },
+  { id:"ajudas",     label:"Ajudas de Custo / Kms",       valor:750.00, icon:"⛽",  cat:"rh", nota:"Variável" },
+  { id:"vodafone",   label:"Vodafone",                    valor:103.75, icon:"📱",  cat:"fixo" },
+  { id:"zoom",       label:"Zoom",                        valor:15.99,  icon:"💻",  cat:"fixo" },
+  { id:"claude",     label:"Claude AI",                   valor:18.00,  icon:"🤖",  cat:"fixo" },
+  { id:"tesla",      label:"Tesla Carregamentos",          valor:10.00,  icon:"⚡",  cat:"var", nota:"Estimado" },
+  { id:"irs_ret",    label:"Retenção IRS",                valor:14.00,  icon:"🏦",  cat:"fiscal" },
+];
+
+const EMP_DESPESAS_PONTUAIS = [
+  { id:"seg_carro",  label:"Seguro Carro (semestral)",    valor:571.00, icon:"🚘",  meses:[2,8] },
+  { id:"seg_at",     label:"Seguro Acidentes Trabalho",   valor:130.00, icon:"⚕️",  meses:[0] },
+];
+
+// Meses com subsídios extra (Junho=5, Dezembro=11)
+const EMP_MESES_SUBSIDIO = [5, 11];
+
+const EMP_DIAS_UTEIS_BASE = {
+  "2026-01":19,"2026-02":18,"2026-03":22,"2026-04":20,"2026-05":20,
+  "2026-06":20,"2026-07":23,"2026-08":21,"2026-09":22,"2026-10":22,
+  "2026-11":20,"2026-12":20
+};
+
+const EMP_OBRIGACOES = [
+  { id:"iva_q1",  label:"IVA 1º Trim (Jan-Mar)",  data:"2026-05-15", valor_est:null, tipo:"iva" },
+  { id:"iva_q2",  label:"IVA 2º Trim (Abr-Jun)",  data:"2026-08-15", valor_est:null, tipo:"iva" },
+  { id:"iva_q3",  label:"IVA 3º Trim (Jul-Set)",  data:"2026-11-15", valor_est:null, tipo:"iva" },
+  { id:"ppc1",    label:"Pagamento por Conta",     data:"2026-07-31", valor_est:134,  tipo:"irc" },
+  { id:"ppc2",    label:"Pagamento por Conta",     data:"2026-09-30", valor_est:134,  tipo:"irc" },
+  { id:"ppc3",    label:"Pagamento por Conta",     data:"2026-12-15", valor_est:134,  tipo:"irc" },
+  { id:"seg_carro1",label:"Seguro Carro",          data:"2026-03-23", valor_est:571,  tipo:"seguro" },
+  { id:"seg_carro2",label:"Seguro Carro",          data:"2026-09-23", valor_est:571,  tipo:"seguro" },
+  { id:"seg_at",  label:"Seguro Acidentes Trab.",  data:"2026-01-01", valor_est:130,  tipo:"seguro" },
+];
+
 const PLAN_LEVELS=[{id:1,name:"Fundo 3 Meses",target:10500,color:"#22c55e",desc:"Rede mínima"},{id:2,name:"Limpar Crédito",target:16000,color:"#f59e0b",desc:"Dívida eliminada"},{id:3,name:"Fundo 6 Meses",target:21000,color:"#06b6d4",desc:"Rede robusta"},{id:4,name:"Investimento",target:1050000,color:"#8b5cf6",desc:"Independência"}];
 
 const fE=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2});
@@ -407,7 +453,13 @@ export default function App(){
   const [cats,setCats,forceCats]=useLS("fin_cats_v6",DEFAULT_CATS);
 
   const [patSnaps,setPatSnaps]=useLS("fin_pat_v1",[]);
-  const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats,patSnaps}),[trans,pend,contas,orcs,snaps,cats,patSnaps]);
+  const [empData,setEmpData]=useLS("fin_emp_v1",{
+    diasTrabalhados:{}, // mesKey -> dias reais
+    despesasReais:{},   // mesKey -> {id: valor_real}
+    saldoConta:1096.32,
+    reservaIVA:0,
+  });
+  const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats,patSnaps,empData}),[trans,pend,contas,orcs,snaps,cats,patSnaps,empData]);
   const handleDriveLoad=useCallback(json=>{
     if(!json) return;
     if(json.trans?.length>0) forceTrans(json.trans);
@@ -417,6 +469,7 @@ export default function App(){
     if(json.snaps?.length>0) forceSnaps(json.snaps);
     if(json.cats && Object.keys(json.cats).length>0) forceCats(json.cats);
     if(json.patSnaps?.length>0) setPatSnaps(json.patSnaps);
+    if(json.empData) setEmpData(json.empData);
   },[forceTrans,forcePend,forceContas,forceOrcs,forceSnaps,forceCats,setPatSnaps]);
   const {status:driveStatus}=useJSONBinSync(allData,handleDriveLoad);
 
@@ -981,6 +1034,336 @@ export default function App(){
       </div>
     </>
   );
+
+
+  // ── EMPRESA ───────────────────────────────────────────────────
+  if(screen==="empresa") {
+    const hoje = new Date();
+    const empMesKey = `${fAno}-${String(fMes+1).padStart(2,"0")}`;
+    const diasBase = EMP_DIAS_UTEIS_BASE[empMesKey] || 20;
+    const diasReais = empData.diasTrabalhados?.[empMesKey] ?? diasBase;
+    const receitaBruta = diasReais * EMP_TAXA_DIARIA;
+    const ivaRecebido = receitaBruta * 0.23;
+    const isSubsidio = EMP_MESES_SUBSIDIO.includes(fMes);
+
+    // Calculate real or projected expenses for current month
+    const despMes = {};
+    EMP_DESPESAS_FIXAS.forEach(d => {
+      despMes[d.id] = empData.despesasReais?.[empMesKey]?.[d.id] ?? d.valor;
+    });
+    // Add pontuais
+    EMP_DESPESAS_PONTUAIS.forEach(d => {
+      if(d.meses.includes(fMes)) despMes[d.id] = empData.despesasReais?.[empMesKey]?.[d.id] ?? d.valor;
+    });
+    // Subsidio extra
+    const subsidioExtra = isSubsidio ? (despMes["salario"]||0) + (despMes["tsu"]||0)*0.5 : 0;
+    const totalDespesas = Object.values(despMes).reduce((a,b)=>a+b,0) + subsidioExtra;
+    const resultado = receitaBruta - totalDespesas;
+
+    // Annual overview
+    const anoOverview = Array.from({length:12},(_,m)=>{
+      const mk = `${fAno}-${String(m+1).padStart(2,"0")}`;
+      const dias = empData.diasTrabalhados?.[mk] ?? EMP_DIAS_UTEIS_BASE[mk] ?? 20;
+      const rec = dias * EMP_TAXA_DIARIA;
+      let desp = EMP_DESPESAS_FIXAS.reduce((a,d)=>{
+        return a + (empData.despesasReais?.[mk]?.[d.id] ?? d.valor);
+      },0);
+      EMP_DESPESAS_PONTUAIS.forEach(d=>{ if(d.meses.includes(m)) desp += empData.despesasReais?.[mk]?.[d.id] ?? d.valor; });
+      if(EMP_MESES_SUBSIDIO.includes(m)) {
+        const sal = empData.despesasReais?.[mk]?.salario ?? 1000;
+        const tsu = empData.despesasReais?.[mk]?.tsu ?? 347.50;
+        desp += sal + tsu * 0.5;
+      }
+      return { mes:m, mk, rec, desp, res:rec-desp, iva:rec*0.23 };
+    });
+    const totalRec = anoOverview.reduce((a,m)=>a+m.rec,0);
+    const totalDesp = anoOverview.reduce((a,m)=>a+m.desp,0);
+    const totalRes = totalRec - totalDesp;
+    const ivaAnual = totalRec * 0.23;
+
+    // Next obligations
+    const proximasObrig = EMP_OBRIGACOES
+      .filter(o=>new Date(o.data) >= hoje)
+      .sort((a,b)=>new Date(a.data)-new Date(b.data))
+      .slice(0,4);
+
+    // IVA acumulado por trimestre
+    const ivaQ = [
+      {label:"1º Trim", meses:[0,1,2], data:"2026-05-15"},
+      {label:"2º Trim", meses:[3,4,5], data:"2026-08-15"},
+      {label:"3º Trim", meses:[6,7,8], data:"2026-11-15"},
+      {label:"4º Trim", meses:[9,10,11], data:"2027-02-15"},
+    ].map(q=>({
+      ...q,
+      iva: q.meses.reduce((a,m)=>{
+        const mk=`${fAno}-${String(m+1).padStart(2,"0")}`;
+        const dias=empData.diasTrabalhados?.[mk]??EMP_DIAS_UTEIS_BASE[mk]??20;
+        return a+(dias*EMP_TAXA_DIARIA*0.23);
+      },0)
+    }));
+
+    return (
+      <>
+        <style>{CSS}</style>
+        <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
+          {/* Header */}
+          <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
+            <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
+            <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>🏢 Linguagem Entusiasta</p>
+            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+              <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{fontSize:12,padding:"5px 8px",width:"auto"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
+              <select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{fontSize:12,padding:"5px 8px",width:"auto"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
+            </div>
+          </div>
+
+          <div style={{padding:mainPad,maxWidth:isMobile?undefined:1000,margin:"0 auto"}} className="fade">
+
+            {/* KPIs */}
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:16}}>
+              {[
+                {label:"Receita Bruta",val:receitaBruta,color:"#22c55e",sub:`${diasReais} dias × ${fE(EMP_TAXA_DIARIA)}`},
+                {label:"Total Despesas",val:totalDespesas,color:"#ef4444",sub:isSubsidio?"incl. subsídio":""},
+                {label:"Resultado",val:resultado,color:resultado>=0?"#22c55e":"#ef4444",sub:resultado>=0?"✓ Positivo":"⚠ Negativo"},
+                {label:"IVA a Reservar",val:ivaRecebido,color:"#f59e0b",sub:"23% da receita"},
+              ].map(k=>(
+                <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:14,padding:"14px"}}>
+                  <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                  <p style={{fontSize:18,fontWeight:700,color:k.color}}>{fE(k.val)}</p>
+                  {k.sub&&<p style={{fontSize:10,color:"#64748b",marginTop:3}}>{k.sub}</p>}
+                </div>
+              ))}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
+
+              {/* Dias trabalhados + receita */}
+              <Card>
+                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📅 Dias Trabalhados — {MESES[fMes]}</p>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                  <div style={{flex:1}}>
+                    <p style={{fontSize:11,color:"#64748b",marginBottom:4}}>Dias úteis base</p>
+                    <p style={{fontSize:16,fontWeight:600,color:"#94a3b8"}}>{diasBase} dias</p>
+                  </div>
+                  <div style={{flex:1}}>
+                    <p style={{fontSize:11,color:"#64748b",marginBottom:4}}>Dias reais</p>
+                    <input type="number" value={diasReais} min={0} max={31}
+                      onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[empMesKey]:parseInt(e.target.value)||0}}))}
+                      style={{fontSize:20,fontWeight:700,color:"#22c55e",background:"none",border:"none",borderBottom:"2px solid #22c55e",borderRadius:0,padding:"2px 4px",width:60,textAlign:"center"}}/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <p style={{fontSize:11,color:"#64748b",marginBottom:4}}>Receita s/IVA</p>
+                    <p style={{fontSize:16,fontWeight:600,color:"#22c55e"}}>{fE(receitaBruta)}</p>
+                  </div>
+                </div>
+                <PBar val={diasReais} max={diasBase} color="#22c55e"/>
+                {isSubsidio&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(245,158,11,0.1)",borderRadius:8}}>
+                  <p style={{fontSize:11,color:"#f59e0b"}}>⚠️ Mês de subsídio — despesa extra: {fE(subsidioExtra)}</p>
+                </div>}
+                <div style={{marginTop:10,padding:"8px",background:"rgba(245,158,11,0.06)",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:11,color:"#64748b"}}>IVA a reservar este mês</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{fE(ivaRecebido)}</span>
+                </div>
+              </Card>
+
+              {/* Próximas obrigações */}
+              <Card>
+                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📆 Próximas Obrigações Fiscais</p>
+                {proximasObrig.map(o=>{
+                  const dias = Math.ceil((new Date(o.data)-hoje)/(1000*60*60*24));
+                  const cor = dias<=30?"#ef4444":dias<=60?"#f59e0b":"#22c55e";
+                  const tipoColor = o.tipo==="iva"?"#f59e0b":o.tipo==="irc"?"#3b82f6":"#94a3b8";
+                  return(
+                    <div key={o.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #0d1a2e"}}>
+                      <div style={{width:40,height:40,borderRadius:10,background:tipoColor+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:10,fontWeight:700,color:tipoColor}}>{o.tipo.toUpperCase()}</span>
+                      </div>
+                      <div style={{flex:1}}>
+                        <p style={{fontSize:12,fontWeight:500}}>{o.label}</p>
+                        <p style={{fontSize:10,color:"#64748b"}}>{o.data}</p>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        {o.valor_est&&<p style={{fontSize:12,fontWeight:600,color:"#fff"}}>{fE(o.valor_est)}</p>}
+                        <p style={{fontSize:11,fontWeight:600,color:cor}}>{dias}d</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* IVA trimestral estimado */}
+                <div style={{marginTop:10}}>
+                  <p style={{fontSize:11,color:"#64748b",marginBottom:6}}>IVA estimado por trimestre:</p>
+                  {ivaQ.map(q=>(
+                    <div key={q.label} style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+                      <span style={{fontSize:11,color:"#94a3b8"}}>{q.label} (prazo {q.data.slice(5)})</span>
+                      <span style={{fontSize:11,fontWeight:600,color:"#f59e0b"}}>{fE(q.iva)}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            {/* Despesas do mês — editáveis */}
+            <Card>
+              <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>💸 Despesas — {MESES[fMes]} {fAno}</p>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"#0a1220"}}>
+                    {["Despesa","Valor Base","Valor Real","Diferença"].map(h=>(
+                      <th key={h} style={{textAlign:h==="Despesa"?"left":"right",padding:"7px 10px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {EMP_DESPESAS_FIXAS.map(d=>{
+                    const real = despMes[d.id] ?? d.valor;
+                    const diff = real - d.valor;
+                    return(
+                      <tr key={d.id} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
+                        <td style={{padding:"7px 10px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span>{d.icon}</span>
+                            <div>
+                              <p style={{fontSize:12}}>{d.label}</p>
+                              {d.nota&&<p style={{fontSize:10,color:"#64748b"}}>{d.nota}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{padding:"7px 10px",textAlign:"right",color:"#64748b"}}>{fE(d.valor)}</td>
+                        <td style={{padding:"4px 6px",textAlign:"right"}}>
+                          <input type="number" value={real} step="0.01"
+                            onChange={e=>setEmpData(p=>({...p,despesasReais:{...p.despesasReais,[empMesKey]:{...(p.despesasReais?.[empMesKey]||{}),[d.id]:parseFloat(e.target.value)||0}}}))}
+                            style={{textAlign:"right",width:100,fontSize:12,padding:"4px 6px"}}/>
+                        </td>
+                        <td style={{padding:"7px 10px",textAlign:"right",color:diff===0?"#64748b":diff>0?"#ef4444":"#22c55e",fontWeight:diff!==0?600:400}}>
+                          {diff===0?"—":`${diff>0?"+":""}${fE(diff)}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Pontuais deste mês */}
+                  {EMP_DESPESAS_PONTUAIS.filter(d=>d.meses.includes(fMes)).map(d=>{
+                    const real = despMes[d.id] ?? d.valor;
+                    const diff = real - d.valor;
+                    return(
+                      <tr key={d.id} className="hrow" style={{borderBottom:"1px solid #0a1220",background:"rgba(245,158,11,0.03)"}}>
+                        <td style={{padding:"7px 10px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span>{d.icon}</span>
+                            <div>
+                              <p style={{fontSize:12}}>{d.label}</p>
+                              <p style={{fontSize:10,color:"#f59e0b"}}>pontual</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{padding:"7px 10px",textAlign:"right",color:"#64748b"}}>{fE(d.valor)}</td>
+                        <td style={{padding:"4px 6px",textAlign:"right"}}>
+                          <input type="number" value={real} step="0.01"
+                            onChange={e=>setEmpData(p=>({...p,despesasReais:{...p.despesasReais,[empMesKey]:{...(p.despesasReais?.[empMesKey]||{}),[d.id]:parseFloat(e.target.value)||0}}}))}
+                            style={{textAlign:"right",width:100,fontSize:12,padding:"4px 6px"}}/>
+                        </td>
+                        <td style={{padding:"7px 10px",textAlign:"right",color:diff>0?"#ef4444":diff<0?"#22c55e":"#64748b"}}>{diff===0?"—":`${diff>0?"+":""}${fE(diff)}`}</td>
+                      </tr>
+                    );
+                  })}
+                  {/* Subsídio extra */}
+                  {isSubsidio&&(
+                    <tr style={{background:"rgba(245,158,11,0.06)",borderTop:"1px solid rgba(245,158,11,0.3)"}}>
+                      <td style={{padding:"7px 10px",color:"#f59e0b"}}>⚠️ Subsídio extra (sal+SS)</td>
+                      <td colSpan={2} style={{padding:"7px 10px",textAlign:"right",color:"#f59e0b",fontWeight:600}}>{fE(subsidioExtra)}</td>
+                      <td/>
+                    </tr>
+                  )}
+                  {/* Total */}
+                  <tr style={{background:"rgba(239,68,68,0.08)",borderTop:"2px solid rgba(239,68,68,0.3)"}}>
+                    <td style={{padding:"9px 10px",fontWeight:700,color:"#ef4444"}}>TOTAL DESPESAS</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b",fontWeight:600}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",fontWeight:700,color:"#ef4444"}}>{fE(totalDespesas)}</td>
+                    <td/>
+                  </tr>
+                  {/* Resultado */}
+                  <tr style={{background:resultado>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderTop:"2px solid "+(resultado>=0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)")}}>
+                    <td style={{padding:"9px 10px",fontWeight:700,color:resultado>=0?"#22c55e":"#ef4444"}}>RESULTADO</td>
+                    <td colSpan={2} style={{padding:"9px 10px",textAlign:"right",fontWeight:700,fontSize:16,color:resultado>=0?"#22c55e":"#ef4444"}}>{fE(resultado)}</td>
+                    <td/>
+                  </tr>
+                </tbody>
+              </table>
+            </Card>
+
+            {/* Annual overview */}
+            <Card>
+              <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:4}}>📈 Overview Anual {fAno}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+                {[
+                  {label:"Receita Total",val:totalRec,color:"#22c55e"},
+                  {label:"Despesas Total",val:totalDesp,color:"#ef4444"},
+                  {label:"Resultado",val:totalRes,color:totalRes>=0?"#22c55e":"#ef4444"},
+                ].map(k=>(
+                  <div key={k.label} style={{background:"#070d1a",borderRadius:10,padding:"10px 12px"}}>
+                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                    <p style={{fontSize:15,fontWeight:700,color:k.color}}>{fE(k.val)}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Breakeven indicator */}
+              {(()=>{
+                const mesesPos = anoOverview.filter(m=>m.res>=0).length;
+                const mesesNeg = anoOverview.filter(m=>m.res<0).length;
+                const margemMedia = totalRes/12;
+                return(
+                  <div style={{padding:"10px 14px",background:totalRes>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,marginBottom:12,display:"flex",gap:12,flexWrap:"wrap"}}>
+                    <div><p style={{fontSize:10,color:"#64748b"}}>Meses positivos</p><p style={{fontSize:14,fontWeight:700,color:"#22c55e"}}>{mesesPos}/12</p></div>
+                    <div><p style={{fontSize:10,color:"#64748b"}}>Margem média/mês</p><p style={{fontSize:14,fontWeight:700,color:margemMedia>=0?"#22c55e":"#ef4444"}}>{fE(margemMedia)}</p></div>
+                    <div><p style={{fontSize:10,color:"#64748b"}}>IVA anual estimado</p><p style={{fontSize:14,fontWeight:700,color:"#f59e0b"}}>{fE(ivaAnual)}</p></div>
+                    <div><p style={{fontSize:10,color:"#64748b"}}>Dias extra para breakeven</p><p style={{fontSize:14,fontWeight:700,color:"#3b82f6"}}>{totalRes<0?Math.ceil(Math.abs(totalRes)/EMP_TAXA_DIARIA)+"d":"✓"}</p></div>
+                  </div>
+                );
+              })()}
+              {/* Monthly table */}
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
+                  <thead>
+                    <tr style={{background:"#0a1220"}}>
+                      {["Mês","Dias","Receita","Despesas","Resultado","IVA"].map(h=>(
+                        <th key={h} style={{padding:"6px 8px",textAlign:h==="Mês"||h==="Dias"?"left":"right",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {anoOverview.map(m=>(
+                      <tr key={m.mes} className="hrow" style={{borderBottom:"1px solid #0a1220",background:m.mes===fMes?"rgba(59,130,246,0.06)":"transparent"}}>
+                        <td style={{padding:"7px 8px",fontWeight:m.mes===fMes?700:400,color:m.mes===fMes?"#3b82f6":"#e2e8f0"}}>{MESES[m.mes]}</td>
+                        <td style={{padding:"7px 8px"}}>
+                          <input type="number" value={empData.diasTrabalhados?.[m.mk]??EMP_DIAS_UTEIS_BASE[m.mk]??20} min={0} max={31}
+                            onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[m.mk]:parseInt(e.target.value)||0}}))}
+                            style={{width:40,fontSize:11,padding:"2px 4px",textAlign:"center"}}/>
+                        </td>
+                        <td style={{padding:"7px 8px",textAlign:"right",color:"#22c55e"}}>{fE(m.rec)}</td>
+                        <td style={{padding:"7px 8px",textAlign:"right",color:"#ef4444"}}>{fE(m.desp)}</td>
+                        <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,color:m.res>=0?"#22c55e":"#ef4444"}}>{fE(m.res)}</td>
+                        <td style={{padding:"7px 8px",textAlign:"right",color:"#f59e0b"}}>{fE(m.iva)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{background:"rgba(255,255,255,0.04)",borderTop:"2px solid #1e3048"}}>
+                      <td style={{padding:"8px",fontWeight:700,color:"#fff"}} colSpan={2}>TOTAL</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#22c55e"}}>{fE(totalRec)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#ef4444"}}>{fE(totalDesp)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:totalRes>=0?"#22c55e":"#ef4444"}}>{fE(totalRes)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#f59e0b"}}>{fE(ivaAnual)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+          </div>
+
+          {isMobile&&<div className="tabbar">
+            <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
+          </div>}
+        </div>
+      </>
+    );
+  }
 
   // ── PLANO ─────────────────────────────────────────────────
   if(screen==="plano") return (
