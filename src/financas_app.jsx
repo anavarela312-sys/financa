@@ -734,41 +734,6 @@ export default function App(){
             </div>
           </div>
 
-          {/* Património */}
-          <div onClick={()=>setScreen("patrimonio")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
-            onMouseEnter={e=>{if(!isMobile){e.currentTarget.style.borderColor="#a855f7";e.currentTarget.style.transform="translateY(-3px)";}}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3048";e.currentTarget.style.transform="translateY(0)";}}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-              <div style={{fontSize:24,width:44,height:44,background:"rgba(168,85,247,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>💎</div>
-              <div><h2 style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:2}}>Património Líquido</h2><p style={{fontSize:12,color:"#64748b"}}>Ativos · Passivos · Investimentos</p></div>
-              <span style={{marginLeft:"auto",color:"#a855f7",fontSize:18}}>›</span>
-            </div>
-            {(()=>{
-              const latest=patSnaps[patSnaps.length-1];
-              if(!latest) return <p style={{fontSize:12,color:"#64748b"}}>Sem dados ainda. Regista o primeiro mês.</p>;
-              const totalA=Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
-              const totalP=Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
-              const pat=totalA-totalP;
-              const prev=patSnaps[patSnaps.length-2];
-              const prevPat=prev?Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0):null;
-              const diff=prevPat!==null?pat-prevPat:null;
-              return(
-                <div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                    <div style={{background:"rgba(168,85,247,0.08)",borderRadius:10,padding:"8px 12px"}}>
-                      <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Património Líquido</p>
-                      <p style={{fontSize:16,fontWeight:600,color:"#a855f7"}}>{fE0(pat)}</p>
-                    </div>
-                    <div style={{background:diff&&diff>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}>
-                      <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>vs mês anterior</p>
-                      <p style={{fontSize:16,fontWeight:600,color:diff&&diff>=0?"#22c55e":"#ef4444"}}>{diff!==null?`${diff>=0?"+":""}${fE0(diff)}`:"—"}</p>
-                    </div>
-                  </div>
-                  <p style={{fontSize:10,color:"#64748b"}}>Último registo: {latest.mes}</p>
-                </div>
-              );
-            })()}
-          </div>
         </div>
         <div style={{width:"100%",maxWidth:480}}>
           {/* Empresa card */}
@@ -1146,12 +1111,31 @@ export default function App(){
           <div style={{padding:mainPad,maxWidth:isMobile?undefined:1000,margin:"0 auto"}} className="fade">
 
             {/* KPIs */}
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:16}}>
+            {/* Receita breakdown: s/IVA, IVA, c/IVA */}
+            <div style={{background:"#0d1a2e",border:"1px solid rgba(34,197,94,0.3)",borderRadius:14,padding:"14px",marginBottom:10}}>
+              <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>💰 Receita {MESES[fMes]} — {diasReais} dias × {fE(EMP_TAXA_DIARIA)}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                <div style={{background:"rgba(34,197,94,0.08)",borderRadius:10,padding:"10px 12px"}}>
+                  <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>Valor s/ IVA</p>
+                  <p style={{fontSize:18,fontWeight:700,color:"#22c55e"}}>{fE(receitaBruta)}</p>
+                </div>
+                <div style={{background:"rgba(245,158,11,0.08)",borderRadius:10,padding:"10px 12px"}}>
+                  <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>IVA (23%)</p>
+                  <p style={{fontSize:18,fontWeight:700,color:"#f59e0b"}}>{fE(ivaRecebido)}</p>
+                  <p style={{fontSize:9,color:"#64748b",marginTop:2}}>↗ reservar</p>
+                </div>
+                <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"10px 12px"}}>
+                  <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>Valor c/ IVA</p>
+                  <p style={{fontSize:18,fontWeight:700,color:"#3b82f6"}}>{fE(receitaBruta+ivaRecebido)}</p>
+                  <p style={{fontSize:9,color:"#64748b",marginTop:2}}>recebido a dia 17</p>
+                </div>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:10,marginBottom:16}}>
               {[
-                {label:"Receita Bruta",val:receitaBruta,color:"#22c55e",sub:`${diasReais} dias × ${fE(EMP_TAXA_DIARIA)}`},
-                {label:"Total Despesas",val:totalDespesas,color:"#ef4444",sub:isSubsidio?"incl. subsídio":""},
-                {label:"Resultado",val:resultado,color:resultado>=0?"#22c55e":"#ef4444",sub:resultado>=0?"✓ Positivo":"⚠ Negativo"},
-                {label:"IVA a Reservar",val:ivaRecebido,color:"#f59e0b",sub:"23% da receita"},
+                {label:"Total Despesas",val:totalDespesas,color:"#ef4444",sub:isSubsidio?"⚠ incl. subsídio":"mês corrente"},
+                {label:"Resultado Operacional",val:resultado,color:resultado>=0?"#22c55e":"#ef4444",sub:resultado>=0?"✓ Positivo":"⚠ Negativo"},
+                {label:"IRC estimado anual",val:Math.max(0,totalRes*0.17),color:"#a855f7",sub:"taxa ~17% s/ lucro"},
               ].map(k=>(
                 <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:14,padding:"14px"}}>
                   <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
@@ -1341,7 +1325,9 @@ export default function App(){
                     <div><p style={{fontSize:10,color:"#64748b"}}>Meses positivos</p><p style={{fontSize:14,fontWeight:700,color:"#22c55e"}}>{mesesPos}/12</p></div>
                     <div><p style={{fontSize:10,color:"#64748b"}}>Margem média/mês</p><p style={{fontSize:14,fontWeight:700,color:margemMedia>=0?"#22c55e":"#ef4444"}}>{fE(margemMedia)}</p></div>
                     <div><p style={{fontSize:10,color:"#64748b"}}>IVA anual estimado</p><p style={{fontSize:14,fontWeight:700,color:"#f59e0b"}}>{fE(ivaAnual)}</p></div>
-                    <div><p style={{fontSize:10,color:"#64748b"}}>Dias extra para breakeven</p><p style={{fontSize:14,fontWeight:700,color:"#3b82f6"}}>{totalRes<0?Math.ceil(Math.abs(totalRes)/EMP_TAXA_DIARIA)+"d":"✓"}</p></div>
+                    <div><p style={{fontSize:10,color:"#64748b"}}>Dias extra p/ breakeven</p><p style={{fontSize:14,fontWeight:700,color:"#3b82f6"}}>{totalRes<0?Math.ceil(Math.abs(totalRes)/EMP_TAXA_DIARIA)+"d":"✓"}</p></div>
+                  <div><p style={{fontSize:10,color:"#64748b"}}>IRC estimado (~17%)</p><p style={{fontSize:14,fontWeight:700,color:"#a855f7"}}>{totalRes>0?fE(totalRes*0.17):"—"}</p></div>
+                  <div><p style={{fontSize:10,color:"#64748b"}}>Resultado líq. estimado</p><p style={{fontSize:14,fontWeight:700,color:totalRes>0?"#22c55e":"#ef4444"}}>{fE(totalRes>0?totalRes*0.83:totalRes)}</p></div>
                   </div>
                 );
               })()}
@@ -1350,7 +1336,7 @@ export default function App(){
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
                   <thead>
                     <tr style={{background:"#0a1220"}}>
-                      {["Mês","Dias","Receita","Despesas","Resultado","IVA"].map(h=>(
+                      {["Mês","Dias","s/IVA","c/IVA","IVA","Despesas","Resultado"].map(h=>(
                         <th key={h} style={{padding:"6px 8px",textAlign:h==="Mês"||h==="Dias"?"left":"right",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
                       ))}
                     </tr>
@@ -1358,25 +1344,40 @@ export default function App(){
                   <tbody>
                     {anoOverview.map(m=>(
                       <tr key={m.mes} className="hrow" style={{borderBottom:"1px solid #0a1220",background:m.mes===fMes?"rgba(59,130,246,0.06)":"transparent"}}>
-                        <td style={{padding:"7px 8px",fontWeight:m.mes===fMes?700:400,color:m.mes===fMes?"#3b82f6":"#e2e8f0"}}>{MESES[m.mes]}</td>
-                        <td style={{padding:"7px 8px"}}>
+                        <td style={{padding:"7px 8px",fontWeight:m.mes===fMes?700:400,color:m.mes===fMes?"#3b82f6":"#e2e8f0"}}>
+                          {MESES[m.mes]}{EMP_MESES_SUBSIDIO.includes(m.mes)&&<span style={{fontSize:9,color:"#f59e0b",marginLeft:4}}>+sub</span>}
+                        </td>
+                        <td style={{padding:"4px 6px"}}>
                           <input type="number" value={empData.diasTrabalhados?.[m.mk]??EMP_DIAS_UTEIS_BASE[m.mk]??20} min={0} max={31}
                             onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[m.mk]:parseInt(e.target.value)||0}}))}
-                            style={{width:40,fontSize:11,padding:"2px 4px",textAlign:"center"}}/>
+                            style={{width:38,fontSize:11,padding:"2px 4px",textAlign:"center"}}/>
                         </td>
                         <td style={{padding:"7px 8px",textAlign:"right",color:"#22c55e"}}>{fE(m.rec)}</td>
+                        <td style={{padding:"7px 8px",textAlign:"right",color:"#3b82f6"}}>{fE(m.rec*1.23)}</td>
+                        <td style={{padding:"7px 8px",textAlign:"right",color:"#f59e0b"}}>{fE(m.iva)}</td>
                         <td style={{padding:"7px 8px",textAlign:"right",color:"#ef4444"}}>{fE(m.desp)}</td>
                         <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,color:m.res>=0?"#22c55e":"#ef4444"}}>{fE(m.res)}</td>
-                        <td style={{padding:"7px 8px",textAlign:"right",color:"#f59e0b"}}>{fE(m.iva)}</td>
                       </tr>
                     ))}
                     <tr style={{background:"rgba(255,255,255,0.04)",borderTop:"2px solid #1e3048"}}>
                       <td style={{padding:"8px",fontWeight:700,color:"#fff"}} colSpan={2}>TOTAL</td>
                       <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#22c55e"}}>{fE(totalRec)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#3b82f6"}}>{fE(totalRec*1.23)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#f59e0b"}}>{fE(ivaAnual)}</td>
                       <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#ef4444"}}>{fE(totalDesp)}</td>
                       <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:totalRes>=0?"#22c55e":"#ef4444"}}>{fE(totalRes)}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:700,color:"#f59e0b"}}>{fE(ivaAnual)}</td>
                     </tr>
+                    {/* IRC estimate row */}
+                    {totalRes>0&&<tr style={{background:"rgba(168,85,247,0.06)",borderTop:"1px solid rgba(168,85,247,0.2)"}}>
+                      <td style={{padding:"7px 8px",color:"#a855f7",fontWeight:600}} colSpan={2}>IRC estimado (~17%)</td>
+                      <td colSpan={4}/>
+                      <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#a855f7"}}>-{fE(totalRes*0.17)}</td>
+                    </tr>}
+                    {totalRes>0&&<tr style={{background:"rgba(34,197,94,0.06)",borderTop:"1px solid rgba(34,197,94,0.2)"}}>
+                      <td style={{padding:"7px 8px",color:"#22c55e",fontWeight:700}} colSpan={2}>Resultado líquido estimado</td>
+                      <td colSpan={4}/>
+                      <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontSize:14,color:"#22c55e"}}>{fE(totalRes*0.83)}</td>
+                    </tr>}
                   </tbody>
                 </table>
               </div>
