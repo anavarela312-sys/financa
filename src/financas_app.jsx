@@ -2213,7 +2213,7 @@ export default function App(){
           })()}
 
           {/* ── SUB-TAB REGISTAR ── */}
-          {patSubTab==="registar"&&<>
+          {patSubTab==="registar"&&<div>
 
           {/* Register month form — Excel style */}
           <Card>
@@ -2373,7 +2373,7 @@ export default function App(){
             </button>
           </Card>
 
-          </>}
+          </div>}
 
         </div>
         </div>
