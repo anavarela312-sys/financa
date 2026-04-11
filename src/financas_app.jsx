@@ -511,16 +511,13 @@ export default function App(){
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
 
   const [addManual,setAddManual]=useState(false);
+  const [contaFiltro,setContaFiltro]=useState("mill"); // selected account in transactions
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
-  // Sync contaOrigem with contaFiltro when it changes
-  useEffect(()=>{
-    if(contaFiltro&&contaFiltro!=="all") setManualT(t=>({...t,contaOrigem:contaFiltro}));
-  },[contaFiltro]);
+
   const [search,setSearch]=useState("");
   const [globalSearch,setGlobalSearch]=useState("");
   const [showGlobalSearch,setShowGlobalSearch]=useState(false);
   const [searchVal,setSearchVal]=useState("");
-  const [contaFiltro,setContaFiltro]=useState("mill"); // selected account in transactions
   const [splitModal,setSplitModal]=useState(null); // transaction id to split
   const [splitParts,setSplitParts]=useState([]); // [{id, val, cat, sub, nota}]
   const [dateFrom,setDateFrom]=useState("");
