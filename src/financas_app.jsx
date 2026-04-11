@@ -353,6 +353,11 @@ const EMP_CATS_VARIAVEIS = [
 const EMP_TA_AJUDAS = 0.05; // 5% sobre ajudas de custo (dentro dos limites legais)
 const EMP_TA_REP    = 0.10; // 10% sobre despesas de representação
 
+const fE=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2});
+const fE0=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const CAT_COLORS=["#3b82f6","#ef4444","#f97316","#84cc16","#6366f1","#ec4899","#8b5cf6","#eab308","#14b8a6","#f59e0b","#06b6d4","#22c55e","#a855f7","#78716c"];
+
 // Meses com subsídios extra (Junho=5, Dezembro=11)
 const EMP_MESES_SUBSIDIO = [5, 11];
 
@@ -376,10 +381,6 @@ const EMP_OBRIGACOES = [
 
 const PLAN_LEVELS=[{id:1,name:"Fundo 3 Meses",target:10500,color:"#22c55e",desc:"Rede mínima"},{id:2,name:"Limpar Crédito",target:16000,color:"#f59e0b",desc:"Dívida eliminada"},{id:3,name:"Fundo 6 Meses",target:21000,color:"#06b6d4",desc:"Rede robusta"},{id:4,name:"Investimento",target:1050000,color:"#8b5cf6",desc:"Independência"}];
 
-const fE=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2});
-const fE0=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
-const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-const CAT_COLORS=["#3b82f6","#ef4444","#f97316","#84cc16","#6366f1","#ec4899","#8b5cf6","#eab308","#14b8a6","#f59e0b","#06b6d4","#22c55e","#a855f7","#78716c"];
 
 const CSS=`
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400&display=swap');
