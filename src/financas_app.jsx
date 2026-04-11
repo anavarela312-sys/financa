@@ -210,7 +210,8 @@ function parseLines(text, cats) {
     const val = parseVal(mont); if (val===0) continue;
     const cr = tipo?.toLowerCase().includes("créd") || val > 0;
     const r = autoCat(desc, cats);
-    out.push({ id:crypto.randomUUID(), data:r?.d1?nextMonth(data):data, dataOrig:data, desc, val:Math.abs(val), tipo:cr?"c":"d", cat:r?.cat||"", sub:r?.sub||"", ent:r?.ent||"", nota:"", ok:!!r, contaId:"mill" });
+    const saldoExtrato = p[4]?parseVal(p[4].trim()):null;
+    out.push({ id:crypto.randomUUID(), data:r?.d1?nextMonth(data):data, dataOrig:data, desc, val:Math.abs(val), tipo:cr?"c":"d", cat:r?.cat||"", sub:r?.sub||"", ent:r?.ent||"", nota:"", ok:!!r, contaId:"mill", saldoExtrato });
   }
   return out.sort((a,b)=>b.data.localeCompare(a.data));
 }
@@ -574,23 +575,11 @@ export default function App(){
   // Running balance: sort by date, calculate saldo after each
   const transMesWithBalance = useMemo(()=>{
     const sorted=[...transMes].sort((a,b)=>a.data.localeCompare(b.data)||a.id.localeCompare(b.id));
-    // Use saldoInicial from selected account
-    const selectedConta = contas.find(c=>c.id===contaFiltro);
-    const transAntes = trans.filter(t=>{
-      const [y,m]=t.data.split("-");
-      const beforeMonth=parseInt(y)<fAno||(parseInt(y)===fAno&&parseInt(m)-1<fMes);
-      const sameAccount=(t.contaId||t.contaOrigem||"mill")===contaFiltro;
-      return beforeMonth&&sameAccount;
-    });
-    const saldoBase = selectedConta?.saldoInicial!=null
-      ? selectedConta.saldoInicial + transAntes.filter(t=>!isInt(t)).reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0)
-      : 0;
-    let bal=saldoBase;
+    // Prefer saldoExtrato from bank if available, otherwise calculate
     return sorted.map(t=>{
-      if(!isInt(t)) bal+=(t.tipo==="c"?t.val:-t.val);
-      return{...t,saldoApos:bal};
+      return{...t, saldoApos: t.saldoExtrato!=null ? t.saldoExtrato : null};
     }).reverse();
-  },[transMes,trans,contas,fMes,fAno]);
+  },[transMes]);
 
   const desp=transMesTodos.filter(t=>t.tipo==="d"&&!isInt(t));
   const rec=transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t));
@@ -778,8 +767,9 @@ export default function App(){
   const catTransactions=catModal?(()=>{
     if(catModal.includes("::")){
       const [cat,sub]=catModal.split("::");
-      return transMesTodos.filter(t=>t.cat===cat&&t.sub===sub);
+      return transMesTodos.filter(t=>t.cat===cat&&(t.sub===sub||(t.splits&&t.splits.some(s=>s.cat===cat&&s.sub===sub))));
     }
+    if(catModal==="Receita") return transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t));
     return transMesTodos.filter(t=>t.cat===catModal);
   })():[];
   const catModalLabel=catModal?.includes("::")?catModal.split("::")[1]:catModal;
@@ -1786,21 +1776,28 @@ export default function App(){
 
           {/* Histórico Nível 1 */}
           <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>Histórico mensal — Apparte</p>
+            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:4}}>Histórico — Nível 1</p>
+            <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Total acumulado: Apparte + Certificados de Aforro</p>
             {snaps.map((s,i)=>{const dev=s.actual-s.planned;return(
-              <div key={i} style={{display:"flex",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #0d1a2e"}}>
-                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":"#64748b",minWidth:70}}>{s.label}</span>
-                <span style={{fontSize:11,color:"#64748b",minWidth:70}}>plano {fE(s.planned)}</span>
-                <span style={{fontSize:13,fontWeight:600,color:"#fff",flex:1}}>{fE(s.actual)}</span>
-                <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444",fontWeight:600}}>{dev>=0?"+":""}{fE(dev)}</span>
+              <div key={i} style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 80px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:"1px solid #0d1a2e"}}>
+                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":"#64748b",fontWeight:i===snaps.length-1?700:400}}>{s.label}</span>
+                <div>
+                  <p style={{fontSize:10,color:"#64748b",marginBottom:1}}>Plano</p>
+                  <p style={{fontSize:12,color:"#64748b"}}>{fE(s.planned)}</p>
+                </div>
+                <div>
+                  <p style={{fontSize:10,color:"#64748b",marginBottom:1}}>Real</p>
+                  <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(s.actual)}</p>
+                </div>
+                <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444",fontWeight:600,textAlign:"right"}}>{dev>=0?"+":""}{fE(dev)}</span>
               </div>
             );})}
-            <div style={{display:"flex",gap:8,marginTop:12}}>
-              <input type="number" placeholder="Valor actual no Apparte (€)" value={newSnap} onChange={e=>setNewSnap(e.target.value)} style={{flex:1}}/>
+            <div style={{display:"flex",gap:8,marginTop:14}}>
+              <input type="number" placeholder="Total Nível 1 actual (Apparte + CA) em €" value={newSnap} onChange={e=>setNewSnap(e.target.value)} style={{flex:1}}/>
               <Btn variant="primary" style={{fontSize:12,padding:"10px 12px",whiteSpace:"nowrap"}} onClick={()=>{
                 const v=parseFloat(newSnap);if(isNaN(v))return;
                 const last=snaps[snaps.length-1];let nm=last.month+1,ny=last.year;if(nm>11){nm=0;ny++;}
-                const pl=Math.min(1000+800*Math.max(0,nm-3+(ny-2026)*12),L1_APPARTE);
+                const pl=Math.min(800*Math.max(0,nm-3+(ny-2026)*12),L1_TOTAL);
                 setSnaps(prev=>[...prev,{label:`${MESES[nm]} ${ny}`,year:ny,month:nm,planned:Math.max(0,pl),actual:v,note:v>=pl?"✓ No plano":"⚠ Abaixo"}]);setNewSnap("");
               }}>Registar</Btn>
             </div>
@@ -1813,7 +1810,7 @@ export default function App(){
 
             {/* Milestones */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
-              {[{label:"Milestone 500k",val:500000,color:"#06b6d4"},{label:"Objetivo IF 1.05M",val:1050000,color:"#8b5cf6"}].map(m=>(
+              {[{label:"🌅 Liberdade Financeira",val:500000,color:"#06b6d4"},{label:"🔥 FIRE",val:1050000,color:"#8b5cf6"}].map(m=>(
                 <div key={m.label} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 12px",border:`1px solid ${m.color}33`}}>
                   <p style={{fontSize:10,color:"#64748b",marginBottom:3}}>{m.label}</p>
                   <p style={{fontSize:16,fontWeight:700,color:m.color}}>{fE(m.val)}</p>
@@ -1821,71 +1818,135 @@ export default function App(){
               ))}
             </div>
 
-            {/* Projecção calculada */}
             {(()=>{
-              // Phase 1: 100€/mês até Out 2028 = 30 meses from Apr 2026
-              // Phase 2: 1200€/mês from Nov 2028
-              const calc=(taxa)=>{
-                let cap=L1_INVEST;
-                const r=taxa/100/12;
-                // Phase 1: 30 months
-                for(let i=0;i<30;i++) cap=cap*(1+r)+100;
-                return cap;
-              };
-              const calcFull=(taxa,years)=>{
-                let cap=L1_INVEST;
-                const r=taxa/100/12;
-                for(let i=0;i<30;i++) cap=cap*(1+r)+100; // phase 1
-                const restMonths=years*12-30;
-                for(let i=0;i<restMonths;i++) cap=cap*(1+r)+1200; // phase 2
-                return cap;
-              };
-              const milestones500=(taxa)=>{
+              const hoje = new Date(2026,3,1);
+              const calcMilestone=(taxa,target)=>{
                 let cap=L1_INVEST; const r=taxa/100/12; let m=0;
-                while(cap<500000&&m<600){
-                  cap=cap*(1+r)+(m<30?100:1200);
-                  m++;
-                }
+                while(cap<target&&m<720){cap=cap*(1+r)+(m<30?100:1200);m++;}
                 return m;
               };
-              return(
-                <div>
-                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:8,marginBottom:10}}>
-                    {[{taxa:5,color:"#64748b"},{taxa:8,color:"#06b6d4"},{taxa:10,color:"#f59e0b"}].map(s=>{
-                      const m500=milestones500(s.taxa);
-                      const dt500=new Date(2026,3,1);dt500.setMonth(dt500.getMonth()+m500);
-                      const v10=calcFull(s.taxa,10),v20=calcFull(s.taxa,20),v30=calcFull(s.taxa,30);
-                      return(
-                        <div key={s.taxa} style={{background:"#070d1a",borderRadius:10,padding:"12px"}}>
-                          <p style={{fontSize:11,fontWeight:700,color:s.color,marginBottom:8}}>Cenário {s.taxa}%</p>
-                          <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                              <span style={{fontSize:10,color:"#64748b"}}>500k em</span>
-                              <span style={{fontSize:10,fontWeight:600,color:s.color}}>{MESES[dt500.getMonth()]} {dt500.getFullYear()}</span>
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                              <span style={{fontSize:10,color:"#64748b"}}>10 anos</span>
-                              <span style={{fontSize:10,color:"#e2e8f0"}}>{v10>=1000000?(v10/1000000).toFixed(2)+"M":(v10/1000).toFixed(0)+"k"}</span>
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                              <span style={{fontSize:10,color:"#64748b"}}>20 anos</span>
-                              <span style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{v20>=1000000?(v20/1000000).toFixed(2)+"M":(v20/1000).toFixed(0)+"k"}</span>
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                              <span style={{fontSize:10,color:"#64748b"}}>30 anos</span>
-                              <span style={{fontSize:12,fontWeight:700,color:s.color}}>{v30>=1000000?(v30/1000000).toFixed(2)+"M":(v30/1000).toFixed(0)+"k"}</span>
-                            </div>
+              const calcFull=(taxa,years)=>{
+                let cap=L1_INVEST; const r=taxa/100/12;
+                for(let i=0;i<30;i++) cap=cap*(1+r)+100;
+                for(let i=0;i<years*12-30;i++) cap=cap*(1+r)+1200;
+                return cap;
+              };
+              const cenarios=[{taxa:5,color:"#64748b"},{taxa:8,color:"#06b6d4"},{taxa:10,color:"#f59e0b"}];
+
+              // Chart data — 40 years
+              const chartYears=40;
+              const chartPts=cenarios.map(s=>{
+                const pts=[{yr:0,val:L1_INVEST}];
+                let cap=L1_INVEST; const r=s.taxa/100/12;
+                for(let m=1;m<=chartYears*12;m++){
+                  cap=cap*(1+r)+(m<=30?100:1200);
+                  if(m%12===0) pts.push({yr:m/12,val:cap});
+                }
+                return{...s,pts};
+              });
+              const maxVal=Math.max(...chartPts.flatMap(s=>s.pts.map(p=>p.val)),1050000);
+              const W=600,H=180,pad={l:60,r:10,t:10,b:30};
+              const toX=yr=>(yr/chartYears)*(W-pad.l-pad.r)+pad.l;
+              const toY=v=>H-pad.b-((v/maxVal)*(H-pad.t-pad.b));
+              // Y axis ticks
+              const yTicks=[0,250000,500000,750000,1050000];
+              const fmtY=v=>v>=1000000?(v/1000000).toFixed(2)+"M":v>=1000?(v/1000).toFixed(0)+"k":"0";
+              // X axis ticks
+              const xTicks=[0,5,10,15,20,25,30,35,40];
+
+              return(<>
+                {/* Cenários grid */}
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:8,marginBottom:14}}>
+                  {cenarios.map(s=>{
+                    const mLF=calcMilestone(s.taxa,500000);
+                    const mFIRE=calcMilestone(s.taxa,1050000);
+                    const dtLF=new Date(hoje);dtLF.setMonth(dtLF.getMonth()+mLF);
+                    const dtFIRE=new Date(hoje);dtFIRE.setMonth(dtFIRE.getMonth()+mFIRE);
+                    const anosLF=Math.round(mLF/12);
+                    const anosFIRE=Math.round(mFIRE/12);
+                    const v10=calcFull(s.taxa,10),v20=calcFull(s.taxa,20),v30=calcFull(s.taxa,30);
+                    return(
+                      <div key={s.taxa} style={{background:"#070d1a",borderRadius:10,padding:"12px",border:`1px solid ${s.color}22`}}>
+                        <p style={{fontSize:12,fontWeight:700,color:s.color,marginBottom:10}}>Cenário {s.taxa}%</p>
+                        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                          <div style={{padding:"6px 8px",background:"rgba(6,182,212,0.08)",borderRadius:6}}>
+                            <p style={{fontSize:9,color:"#64748b",marginBottom:1}}>🌅 Liberdade Financeira</p>
+                            <p style={{fontSize:11,fontWeight:600,color:"#06b6d4"}}>{MESES[dtLF.getMonth()]} {dtLF.getFullYear()} <span style={{color:"#64748b",fontWeight:400}}>· daqui a {anosLF}a</span></p>
+                          </div>
+                          <div style={{padding:"6px 8px",background:"rgba(139,92,246,0.08)",borderRadius:6}}>
+                            <p style={{fontSize:9,color:"#64748b",marginBottom:1}}>🔥 FIRE</p>
+                            <p style={{fontSize:11,fontWeight:600,color:"#8b5cf6"}}>{MESES[dtFIRE.getMonth()]} {dtFIRE.getFullYear()} <span style={{color:"#64748b",fontWeight:400}}>· daqui a {anosFIRE}a</span></p>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+                            <span style={{fontSize:10,color:"#64748b"}}>10a</span>
+                            <span style={{fontSize:10,color:"#e2e8f0"}}>{v10>=1000000?(v10/1000000).toFixed(2)+"M":(v10/1000).toFixed(0)+"k"}</span>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{fontSize:10,color:"#64748b"}}>20a</span>
+                            <span style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{v20>=1000000?(v20/1000000).toFixed(2)+"M":(v20/1000).toFixed(0)+"k"}</span>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{fontSize:10,color:"#64748b"}}>30a</span>
+                            <span style={{fontSize:12,fontWeight:700,color:s.color}}>{v30>=1000000?(v30/1000000).toFixed(2)+"M":(v30/1000).toFixed(0)+"k"}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{padding:"8px 12px",background:"rgba(34,197,94,0.06)",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
-                    <span style={{fontSize:11,color:"#94a3b8"}}>Objetivo IF · Regra 4%</span>
-                    <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>1.050.000 €</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Gráfico linhas */}
+                <div style={{marginTop:8}}>
+                  <p style={{fontSize:12,fontWeight:600,color:"#fff",marginBottom:8}}>Projecção de crescimento</p>
+                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{overflow:"visible"}}>
+                    {/* Grid horizontal */}
+                    {yTicks.map(v=>(
+                      <g key={v}>
+                        <line x1={pad.l} y1={toY(v)} x2={W-pad.r} y2={toY(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
+                        <text x={pad.l-4} y={toY(v)+4} textAnchor="end" fill="#64748b" fontSize="9">{fmtY(v)}</text>
+                      </g>
+                    ))}
+                    {/* Grid vertical + X labels */}
+                    {xTicks.map(yr=>(
+                      <g key={yr}>
+                        <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke="#1e3048" strokeWidth="1" strokeDasharray="2,4"/>
+                        <text x={toX(yr)} y={H-pad.b+12} textAnchor="middle" fill="#64748b" fontSize="9">{yr}a</text>
+                      </g>
+                    ))}
+                    {/* Linhas LF e FIRE */}
+                    <line x1={pad.l} y1={toY(500000)} x2={W-pad.r} y2={toY(500000)} stroke="#06b6d4" strokeWidth="1" strokeDasharray="4,3" opacity="0.5"/>
+                    <text x={W-pad.r+2} y={toY(500000)+4} fill="#06b6d4" fontSize="8">LF</text>
+                    <line x1={pad.l} y1={toY(1050000)} x2={W-pad.r} y2={toY(1050000)} stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4,3" opacity="0.5"/>
+                    <text x={W-pad.r+2} y={toY(1050000)+4} fill="#8b5cf6" fontSize="8">FIRE</text>
+                    {/* Cenário lines */}
+                    {chartPts.map(s=>(
+                      <polyline key={s.taxa}
+                        points={s.pts.map(p=>`${toX(p.yr)},${toY(p.val)}`).join(" ")}
+                        fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round"/>
+                    ))}
+                    {/* Eixos */}
+                    <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
+                    <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
+                  </svg>
+                  {/* Legenda */}
+                  <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:6}}>
+                    {cenarios.map(s=>(
+                      <div key={s.taxa} style={{display:"flex",alignItems:"center",gap:4}}>
+                        <div style={{width:16,height:2,background:s.color,borderRadius:1}}/>
+                        <span style={{fontSize:10,color:"#64748b"}}>{s.taxa}%</span>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <div style={{width:16,height:1,background:"#06b6d4",borderRadius:1,borderTop:"1px dashed #06b6d4"}}/>
+                      <span style={{fontSize:10,color:"#64748b"}}>LF 500k</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <div style={{width:16,height:1,background:"#8b5cf6",borderRadius:1,borderTop:"1px dashed #8b5cf6"}}/>
+                      <span style={{fontSize:10,color:"#64748b"}}>FIRE 1.05M</span>
+                    </div>
                   </div>
                 </div>
-              );
+              </>);
             })()}
           </Card>
 
@@ -1957,6 +2018,7 @@ export default function App(){
           </div>
 
           {/* ── SUB-TAB GERAL ── */}
+          <div style={{maxWidth:isMobile?undefined:1100,margin:"0 auto"}}>
           {patSubTab==="geral"&&(()=>{
             const latest=patSnaps[patSnaps.length-1];
             const prev=patSnaps[patSnaps.length-2];
@@ -1995,7 +2057,7 @@ export default function App(){
                     <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
                       <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
                       {k.val!==null&&k.val!==undefined
-                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||"#fff"}}>{k.val>=0?"+":""}{fE(k.val)}</p>
+                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||"#fff"}}>{k.isVar&&k.val>=0?"+":""}{fE(k.val)}</p>
                         :<p style={{fontSize:14,color:"#64748b"}}>—</p>}
                       {k.isVar&&k.pct!==null&&k.pct!==undefined&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
                     </div>
@@ -2007,49 +2069,57 @@ export default function App(){
               {hasLine&&(
                 <Card>
                   <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução do Património Líquido — {patAno}</p>
-                  <div style={{position:"relative",height:140,marginBottom:8}}>
-                    <svg viewBox="0 0 600 130" width="100%" height="130" preserveAspectRatio="none" style={{overflow:"visible"}}>
-                      {/* Grid lines */}
-                      {[0,0.25,0.5,0.75,1].map(p=>(
-                        <line key={p} x1="0" y1={(1-p)*110+10} x2="600" y2={(1-p)*110+10}
-                          stroke="#1e3048" strokeWidth="1" strokeDasharray="4,4"/>
-                      ))}
-                      {/* Line path */}
-                      {(()=>{
-                        const W=600,H2=110;
-                        const pts=lineData.map((d,i)=>({
-                          x:i/(lineData.length-1)*W,
-                          y:d.val!==null?((1-(d.val-minLine)/range)*H2+10):null
-                        }));
-                        const segs=[];let cur=[];
-                        pts.forEach(p=>{
-                          if(p.y!==null){cur.push(p);}
-                          else{if(cur.length>1)segs.push([...cur]);cur=[];}
-                        });
-                        if(cur.length>1)segs.push(cur);
-                        return segs.map((seg,si)=>(
-                          <polyline key={si}
-                            points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
-                            fill="none" stroke="#a855f7" strokeWidth="3" strokeLinejoin="round"/>
-                        ));
-                      })()}
-                      {/* Dots */}
-                      {lineData.map((d,i)=>{
-                        if(d.val===null) return null;
-                        const x=i/(lineData.length-1)*600;
-                        const y=(1-(d.val-minLine)/range)*110+10;
-                        return(<circle key={i} cx={x} cy={y} r="5" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>);
-                      })}
-                    </svg>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between"}}>
-                    {lineData.map((d,i)=>(
-                      <div key={i} style={{flex:1,textAlign:"center"}}>
-                        <p style={{fontSize:9,color:d.val!==null?"#64748b":"#1e3048"}}>{d.mes}</p>
-                        {d.val!==null&&<p style={{fontSize:9,fontWeight:600,color:"#a855f7"}}>{(d.val/1000).toFixed(0)}k</p>}
+                  {(()=>{
+                    const PL=50,PR=10,PT=20,PB=30,W2=600,H2=160;
+                    const innerW=W2-PL-PR,innerH=H2-PT-PB;
+                    const allVals=lineData.filter(d=>d.val!==null).map(d=>d.val);
+                    const minV=allVals.length?Math.min(...allVals)*0.98:0;
+                    const maxV=allVals.length?Math.max(...allVals)*1.02:1;
+                    const rng=maxV-minV||1;
+                    const toX2=i=>PL+(i/11)*innerW;
+                    const toY2=v=>PT+innerH-((v-minV)/rng)*innerH;
+                    // Y ticks
+                    const yStep=(maxV-minV)/4;
+                    const yTicks2=Array.from({length:5},(_,i)=>minV+yStep*i);
+                    const fmtV=v=>v>=1000000?(v/1000000).toFixed(2)+"M":(v/1000).toFixed(1)+"k";
+                    // Build segments
+                    const pts2=lineData.map((d,i)=>({x:toX2(i),y:d.val!==null?toY2(d.val):null,val:d.val,mes:d.mes}));
+                    const segs2=[];let cur2=[];
+                    pts2.forEach(p=>{if(p.y!==null)cur2.push(p);else{if(cur2.length>1)segs2.push([...cur2]);cur2=[];}});
+                    if(cur2.length>1)segs2.push(cur2);
+                    return(
+                      <div style={{marginBottom:8}}>
+                        <svg viewBox={`0 0 ${W2} ${H2}`} width="100%" height={H2} style={{overflow:"visible"}}>
+                          {/* Y grid + labels */}
+                          {yTicks2.map((v,i)=>(
+                            <g key={i}>
+                              <line x1={PL} y1={toY2(v)} x2={W2-PR} y2={toY2(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
+                              <text x={PL-4} y={toY2(v)+4} textAnchor="end" fill="#64748b" fontSize="9">{fmtV(v)}</text>
+                            </g>
+                          ))}
+                          {/* Eixos */}
+                          <line x1={PL} y1={PT} x2={PL} y2={H2-PB} stroke="#1e3048" strokeWidth="1"/>
+                          <line x1={PL} y1={H2-PB} x2={W2-PR} y2={H2-PB} stroke="#1e3048" strokeWidth="1"/>
+                          {/* Lines */}
+                          {segs2.map((seg,si)=>(
+                            <polyline key={si} points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
+                              fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinejoin="round"/>
+                          ))}
+                          {/* Dots + data labels */}
+                          {pts2.map((p,i)=>{
+                            if(p.y===null) return null;
+                            return(
+                              <g key={i}>
+                                <circle cx={p.x} cy={p.y} r="5" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                                <text x={p.x} y={p.y-10} textAnchor="middle" fill="#a855f7" fontSize="9" fontWeight="600">{fmtV(p.val)}</text>
+                                <text x={p.x} y={H2-PB+14} textAnchor="middle" fill="#64748b" fontSize="9">{p.mes}</text>
+                              </g>
+                            );
+                          })}
+                        </svg>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </Card>
               )}
 
@@ -2106,8 +2176,9 @@ export default function App(){
                   const d=latest.ativos?.[item.id];
                   if(!d?.valor) return null;
                   // Get value from contas if available
-                  const contaMatch=contas.find(c=>c.nome.toLowerCase().includes(item.label.toLowerCase().split(" ").pop().toLowerCase()));
-                  const valorReal=contaMatch?contaMatch.saldo:d.valor;
+                  // Use contaId directly, fallback to label match, then patSnap value
+                  const contaMatch=item.contaId?contas.find(c=>c.id===item.contaId):null;
+                  const valorReal=contaMatch?contaMatch.saldo:(d.valor||0);
                   const history=patSnaps.map(s=>s.ativos?.[item.id]?.valor||null);
                   const prev=history[history.length-2];
                   const ganhoMes=prev!==null&&prev!==undefined?valorReal-prev:null;
@@ -2172,30 +2243,52 @@ export default function App(){
                         ))}
                       </select>
                     </div>
-                    <div style={{position:"relative",height:H+20}}>
-                      <svg viewBox={`0 0 600 ${H+20}`} width="100%" height={H+20} preserveAspectRatio="none" style={{overflow:"visible"}}>
-                        {/* Grid */}
-                        {[0.25,0.5,0.75,1].map(p=>(
-                          <line key={p} x1="0" y1={toY(maxV*p)} x2="600" y2={toY(maxV*p)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
-                        ))}
-                        {/* Proj lines */}
-                        {[{pts:p5,color:"#64748b",label:"5%"},{pts:p8,color:"#06b6d4",label:"8%"},{pts:p10,color:"#f59e0b",label:"10%"}].map(({pts,color,label})=>(
-                          <polyline key={label}
-                            points={pts.map((p,i)=>`${i/(pts.length-1)*600},${toY(p.val)}`).join(" ")}
-                            fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.7"/>
-                        ))}
-                        {/* Real line */}
-                        {realHistory.length>1&&(
-                          <polyline
-                            points={realHistory.map((d,i)=>`${i/(realHistory.length-1)*600},${toY(d.val)}`).join(" ")}
-                            fill="none" stroke="#a855f7" strokeWidth="2.5"/>
-                        )}
-                        {/* Real dots */}
-                        {realHistory.map((d,i)=>(
-                          <circle key={i} cx={i/(realHistory.length-1)*600} cy={toY(d.val)} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
-                        ))}
-                      </svg>
-                    </div>
+                    {(()=>{
+                      const IPL=55,IPR=15,IPT=15,IPB=30,IW=600,IH=H+20;
+                      const innerIW=IW-IPL-IPR,innerIH=IH-IPT-IPB;
+                      const toIX=(i,total)=>IPL+(i/(total-1))*innerIW;
+                      const toIY=v=>IPT+innerIH-((v/maxV)*innerIH);
+                      const fmtI=v=>v>=1000000?(v/1000000).toFixed(2)+"M":v>=1000?(v/1000).toFixed(0)+"k":"0";
+                      const yTicksI=[0,0.25,0.5,0.75,1].map(p=>maxV*p);
+                      const xTicksI=Array.from({length:projYears+1},(_,i)=>i).filter(i=>i%5===0);
+                      return(
+                        <svg viewBox={`0 0 ${IW} ${IH}`} width="100%" height={IH} style={{overflow:"visible"}}>
+                          {/* Y grid + labels */}
+                          {yTicksI.map((v,i)=>(
+                            <g key={i}>
+                              <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
+                              <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill="#64748b" fontSize="9">{fmtI(v)}</text>
+                            </g>
+                          ))}
+                          {/* X labels */}
+                          {xTicksI.map(yr=>(
+                            <g key={yr}>
+                              <line x1={toIX(yr,projYears+1)} y1={IPT} x2={toIX(yr,projYears+1)} y2={IH-IPB} stroke="#1e3048" strokeWidth="1" strokeDasharray="2,4" opacity="0.5"/>
+                              <text x={toIX(yr,projYears+1)} y={IH-IPB+14} textAnchor="middle" fill="#64748b" fontSize="9">{yr}a</text>
+                            </g>
+                          ))}
+                          {/* Eixos */}
+                          <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke="#1e3048" strokeWidth="1"/>
+                          <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke="#1e3048" strokeWidth="1"/>
+                          {/* Proj lines */}
+                          {[{pts:p5,color:"#64748b"},{pts:p8,color:"#06b6d4"},{pts:p10,color:"#f59e0b"}].map(({pts,color})=>(
+                            <polyline key={color}
+                              points={pts.map((p,i)=>`${toIX(i,pts.length)},${toIY(p.val)}`).join(" ")}
+                              fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.8"/>
+                          ))}
+                          {/* Real line */}
+                          {realHistory.length>1&&(
+                            <polyline
+                              points={realHistory.map((d,i)=>`${toIX(i,realHistory.length)},${toIY(d.val)}`).join(" ")}
+                              fill="none" stroke="#a855f7" strokeWidth="2.5"/>
+                          )}
+                          {/* Real dots */}
+                          {realHistory.map((d,i)=>(
+                            <circle key={i} cx={toIX(i,realHistory.length)} cy={toIY(d.val)} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                          ))}
+                        </svg>
+                      );
+                    })()}
                     <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
                       {[{color:"#a855f7",label:"Real"},{color:"#64748b",label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true}].map(l=>(
                         <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
@@ -2373,6 +2466,8 @@ export default function App(){
 
           </div>}
 
+          </div>{/* maxWidth wrapper */}
+
         </div>
         </div>
 
@@ -2486,14 +2581,30 @@ export default function App(){
                   <p style={{fontSize:10,color:"#64748b",marginTop:6}}>✓ marca para ignorar este mês</p>
                 </div>
               )}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                {[{label:"Receitas",val:totR,color:"#22c55e"},{label:"Despesas",val:totD,color:"#ef4444"},{label:"Saldo",val:totR-totD,color:totR>=totD?"#22c55e":"#ef4444"},{label:"Movimentos",val:transMes.length,color:"#3b82f6",n:true}].map(k=>(
-                  <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"12px 14px"}}>
-                    <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
-                    <p style={{fontSize:18,fontWeight:600,color:k.color}}>{k.n?k.val:fE(k.val)}</p>
+              {(()=>{
+                const saldo=totR-totD;
+                const taxaPoupanca=totR>0?((totR-totD)/totR*100):0;
+                const totalOrc=Object.entries(orcMes).filter(([k])=>!k.includes("::")).reduce((a,b)=>a+b[1],0);
+                const pctOrc=totalOrc>0?(totD/totalOrc*100):0;
+                const kpis=[
+                  {label:"Receitas",sub:"entradas do mês",val:fE(totR),color:"#22c55e"},
+                  {label:"Despesas",sub:"saídas do mês",val:fE(totD),color:"#ef4444"},
+                  {label:"Saldo",sub:"receitas − despesas",val:fE(saldo),color:saldo>=0?"#22c55e":"#ef4444"},
+                  {label:"Taxa de Poupança",sub:"% das receitas poupadas",val:`${taxaPoupanca.toFixed(1)}%`,color:taxaPoupanca>=20?"#22c55e":taxaPoupanca>=10?"#f59e0b":"#ef4444"},
+                  {label:"Vs Orçamento",sub:totalOrc>0?`${fE(totD)} de ${fE(totalOrc)}`:"sem orçamento definido",val:totalOrc>0?`${pctOrc.toFixed(0)}%`:"—",color:pctOrc>100?"#ef4444":pctOrc>80?"#f59e0b":"#22c55e"},
+                ];
+                return(
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)",gap:8,marginBottom:12}}>
+                    {kpis.map(k=>(
+                      <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:12,padding:"12px 14px"}}>
+                        <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                        <p style={{fontSize:18,fontWeight:600,color:k.color}}>{k.val}</p>
+                        <p style={{fontSize:10,color:"#64748b",marginTop:3}}>{k.sub}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
 
               {/* Contas */}
               <Card>
