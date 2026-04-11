@@ -280,11 +280,11 @@ const PATRIMONIO_ATIVOS = [
   { id:"imovel2",  label:"Investimento Imobiliário",grupo:"imovel",    icon:"🏗️", color:"#6366f1", fixo:false },
   // PPR / Investimentos
   { id:"ppr_lex",  label:"PPR Alves Ribeiro — Lexie",grupo:"investimento",icon:"👧",color:"#ec4899" },
-  { id:"ppr_opt_ana",label:"PPR Optimize Ana",    grupo:"investimento",icon:"📊", color:"#06b6d4" },
-  { id:"ppr_opt_joa",label:"PPR Optimize João",   grupo:"investimento",icon:"📊", color:"#0284c7" },
+  { id:"ppr_opt_ana",label:"PPR Optimize Ana",    grupo:"investimento",icon:"📊", color:"#06b6d4", contaId:"opt_ana" },
+  { id:"ppr_opt_joa",label:"PPR Optimize João",   grupo:"investimento",icon:"📊", color:"#0284c7", contaId:"opt_joa" },
   { id:"ppr_grow_ana",label:"PPR Grow Ana",        grupo:"investimento",icon:"🌱", color:"#10b981" },
   { id:"ppr_grow_joa",label:"PPR Grow João",       grupo:"investimento",icon:"🌱", color:"#059669" },
-  { id:"xtb",      label:"Investimento em Bolsa (XTB)",grupo:"investimento",icon:"📈",color:"#f59e0b" },
+  { id:"xtb",      label:"Investimento em Bolsa (XTB)",grupo:"investimento",icon:"📈",color:"#f59e0b", contaId:"xtb" },
   // Liquidez
   { id:"aforro",   label:"Conta Aforro",           grupo:"liquidez",   icon:"🏦", color:"#64748b" },
   { id:"apparte_total",label:"Apparte (total)",    grupo:"liquidez",   icon:"💰", color:"#22c55e" },
@@ -627,8 +627,8 @@ export default function App(){
       .slice(0,8)
   ,[catData,cats]);
 
-  const appSaldo=contas.find(c=>c.id==="cx_meal")?.saldo||1350; // Mealheiro
-  const caSaldo=contas.find(c=>c.id==="ca")?.saldo||0; // Certificados de Aforro (conta virtual)
+  const appSaldo=contas.find(c=>c.id==="cx_meal")?.saldo??1350; // Mealheiro
+  const caSaldo=contas.find(c=>c.id==="aforro"||c.id==="ca")?.saldo??0; // Certificados de Aforro
   // Level 1: Apparte 1500 + CA 9000 = 10500
   const L1_APPARTE=1500; const L1_CA=9000; const L1_TOTAL=10500;
   const L1_INVEST=1500; // XTB already invested
@@ -2010,37 +2010,37 @@ export default function App(){
                 <Card>
                   <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução do Património Líquido — {patAno}</p>
                   <div style={{position:"relative",height:140,marginBottom:8}}>
-                    <svg width="100%" height="140" style={{overflow:"visible"}}>
+                    <svg viewBox="0 0 600 130" width="100%" height="130" preserveAspectRatio="none" style={{overflow:"visible"}}>
                       {/* Grid lines */}
                       {[0,0.25,0.5,0.75,1].map(p=>(
-                        <line key={p} x1="0%" y1={`${(1-p)*120+10}px`} x2="100%" y2={`${(1-p)*120+10}px`}
+                        <line key={p} x1="0" y1={(1-p)*110+10} x2="600" y2={(1-p)*110+10}
                           stroke="#1e3048" strokeWidth="1" strokeDasharray="4,4"/>
                       ))}
                       {/* Line path */}
                       {(()=>{
+                        const W=600,H2=110;
                         const pts=lineData.map((d,i)=>({
-                          x:(i/(lineData.length-1))*100,
-                          y:d.val!==null?((1-(d.val-minLine)/range)*110+10):null
+                          x:i/(lineData.length-1)*W,
+                          y:d.val!==null?((1-(d.val-minLine)/range)*H2+10):null
                         }));
-                        const segs=[];
-                        let cur=[];
-                        pts.forEach((p,i)=>{
+                        const segs=[];let cur=[];
+                        pts.forEach(p=>{
                           if(p.y!==null){cur.push(p);}
                           else{if(cur.length>1)segs.push([...cur]);cur=[];}
                         });
                         if(cur.length>1)segs.push(cur);
                         return segs.map((seg,si)=>(
                           <polyline key={si}
-                            points={seg.map(p=>`${p.x}%,${p.y}px`).join(" ")}
-                            fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinejoin="round"/>
+                            points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
+                            fill="none" stroke="#a855f7" strokeWidth="3" strokeLinejoin="round"/>
                         ));
                       })()}
                       {/* Dots */}
                       {lineData.map((d,i)=>{
                         if(d.val===null) return null;
-                        const x=(i/(lineData.length-1))*100;
-                        const y=((1-(d.val-minLine)/range)*110+10);
-                        return(<circle key={i} cx={`${x}%`} cy={`${y}px`} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>);
+                        const x=i/(lineData.length-1)*600;
+                        const y=(1-(d.val-minLine)/range)*110+10;
+                        return(<circle key={i} cx={x} cy={y} r="5" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>);
                       })}
                     </svg>
                   </div>
@@ -2175,26 +2175,26 @@ export default function App(){
                       </select>
                     </div>
                     <div style={{position:"relative",height:H+20}}>
-                      <svg width="100%" height={H+20} style={{overflow:"visible"}}>
+                      <svg viewBox={`0 0 600 ${H+20}`} width="100%" height={H+20} preserveAspectRatio="none" style={{overflow:"visible"}}>
                         {/* Grid */}
                         {[0.25,0.5,0.75,1].map(p=>(
-                          <line key={p} x1="0" y1={toY(maxV*p)} x2="100%" y2={toY(maxV*p)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
+                          <line key={p} x1="0" y1={toY(maxV*p)} x2="600" y2={toY(maxV*p)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
                         ))}
                         {/* Proj lines */}
                         {[{pts:p5,color:"#64748b",label:"5%"},{pts:p8,color:"#06b6d4",label:"8%"},{pts:p10,color:"#f59e0b",label:"10%"}].map(({pts,color,label})=>(
                           <polyline key={label}
-                            points={pts.map((p,i)=>`${toX(i,pts.length)},${toY(p.val)}`).join(" ")}
+                            points={pts.map((p,i)=>`${i/(pts.length-1)*600},${toY(p.val)}`).join(" ")}
                             fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.7"/>
                         ))}
                         {/* Real line */}
                         {realHistory.length>1&&(
                           <polyline
-                            points={realHistory.map((d,i)=>`${toX(i,realHistory.length)},${toY(d.val)}`).join(" ")}
+                            points={realHistory.map((d,i)=>`${i/(realHistory.length-1)*600},${toY(d.val)}`).join(" ")}
                             fill="none" stroke="#a855f7" strokeWidth="2.5"/>
                         )}
                         {/* Real dots */}
                         {realHistory.map((d,i)=>(
-                          <circle key={i} cx={toX(i,realHistory.length)} cy={toY(d.val)} r="3" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                          <circle key={i} cx={i/(realHistory.length-1)*600} cy={toY(d.val)} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
                         ))}
                       </svg>
                     </div>
