@@ -2176,14 +2176,16 @@ export default function App(){
                   const d=latest.ativos?.[item.id];
                   if(!d?.valor) return null;
                   // Get value from contas if available
-                  // Use contaId directly, fallback to label match, then patSnap value
+                  // Source priority: 1) latest patSnap, 2) conta saldo, 3) v0
+                  const latestPatVal=patSnaps.length>0?patSnaps[patSnaps.length-1]?.ativos?.[item.id]?.valor:null;
                   const contaMatch=item.contaId?contas.find(c=>c.id===item.contaId):null;
-                  const valorReal=contaMatch?contaMatch.saldo:(d.valor||0);
-                  const history=patSnaps.map(s=>s.ativos?.[item.id]?.valor||null);
-                  const prev=history[history.length-2];
-                  const ganhoMes=prev!==null&&prev!==undefined?valorReal-prev:null;
-                  const ganhoTotal=d.investido?valorReal-d.investido:null;
-                  const pctTotal=d.investido&&d.investido>0?ganhoTotal/d.investido*100:null;
+                  const valorReal=latestPatVal??contaMatch?.saldo??item.v0??0;
+                  // Previous month from patSnaps
+                  const prevPatVal=patSnaps.length>1?patSnaps[patSnaps.length-2]?.ativos?.[item.id]?.valor:null;
+                  const ganhoMes=prevPatVal!=null?valorReal-prevPatVal:null;
+                  const investido=d?.investido||item.v0||0;
+                  const ganhoTotal=investido>0?valorReal-investido:null;
+                  const pctTotal=investido>0&&ganhoTotal!=null?ganhoTotal/investido*100:null;
                   return(
                     <div key={item.id} style={{background:"#0d1a2e",border:`1px solid ${ganhoTotal>=0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:14,padding:14,cursor:"pointer",outline:invSelected===item.id?"2px solid #a855f7":"none"}}
                       onClick={()=>setInvSelected(item.id)}>
@@ -2276,16 +2278,27 @@ export default function App(){
                               points={pts.map((p,i)=>`${toIX(i,pts.length)},${toIY(p.val)}`).join(" ")}
                               fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.8"/>
                           ))}
-                          {/* Real line */}
-                          {realHistory.length>1&&(
-                            <polyline
-                              points={realHistory.map((d,i)=>`${toIX(i,realHistory.length)},${toIY(d.val)}`).join(" ")}
-                              fill="none" stroke="#a855f7" strokeWidth="2.5"/>
-                          )}
-                          {/* Real dots */}
-                          {realHistory.map((d,i)=>(
-                            <circle key={i} cx={toIX(i,realHistory.length)} cy={toIY(d.val)} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
-                          ))}
+                          {/* Real line — positioned by year */}
+                          {realHistory.length>1&&(()=>{
+                            // Map mes to year fraction from Apr 2026
+                            const origin=new Date(2026,3,1);
+                            const toYrFrac=mes=>{
+                              const d=new Date(mes+"-01");
+                              return (d.getFullYear()-2026)*12+(d.getMonth()-3);
+                            };
+                            const pts=realHistory.map((d,i)=>{
+                              const mFrac=i===0?0:toYrFrac(d.mes);
+                              const yr=mFrac/12;
+                              return{x:toIX(Math.min(yr,projYears),projYears+1),y:toIY(d.val),val:d.val};
+                            });
+                            return(<>
+                              <polyline points={pts.map(p=>`${p.x},${p.y}`).join(" ")}
+                                fill="none" stroke="#a855f7" strokeWidth="2.5"/>
+                              {pts.map((p,i)=>(
+                                <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                              ))}
+                            </>);
+                          })()}
                         </svg>
                       );
                     })()}
