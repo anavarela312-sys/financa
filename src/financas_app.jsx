@@ -2258,6 +2258,9 @@ export default function App(){
                             const subPct=subOrc>0?val/subOrc*100:0;
                             const subOver=subOrc>0&&val>subOrc;
                             const subColor=subOver?"#ef4444":subPct>=75?"#f59e0b":"#22c55e";
+                            // If no sub budget, show proportional bar vs category total
+                            const barMax = subOrc>0 ? subOrc : net;
+                            const barColor = subOrc>0 ? subColor : cats[cat]?.color||"#3b82f6";
                             return(
                               <div key={sub} style={{padding:"4px 0 4px 30px",cursor:"pointer"}}
                                 onClick={e=>{e.stopPropagation();setCatModal(cat+"::"+sub);}}>
@@ -2273,7 +2276,7 @@ export default function App(){
                                     ):(subOrc>0&&<span style={{fontSize:10,color:"#64748b"}}>/{fE0(subOrc)}</span>)}
                                   </div>
                                 </div>
-                                {subOrc>0&&<PBar val={val} max={subOrc} color={subColor} h={3}/>}
+                                <PBar val={val} max={barMax} color={barColor} h={3}/>
                               </div>
                             );
                           })}
@@ -2306,20 +2309,30 @@ export default function App(){
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Transações</p></>}
 
-              {/* Account selector */}
-              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,marginBottom:12}}>
-                <button onClick={()=>setContaFiltro("all")}
-                  style={{padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:500,border:"1px solid",borderColor:contaFiltro==="all"?"#3b82f6":"#1e3048",background:contaFiltro==="all"?"rgba(59,130,246,0.15)":"transparent",color:contaFiltro==="all"?"#3b82f6":"#64748b",flexShrink:0,cursor:"pointer"}}>
-                  Todas
-                </button>
-                {contas.map(c=>(
-                  <button key={c.id} onClick={()=>setContaFiltro(c.id)}
-                    style={{padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:500,border:"1px solid",borderColor:contaFiltro===c.id?c.cor:"#1e3048",background:contaFiltro===c.id?c.cor+"22":"transparent",color:contaFiltro===c.id?c.cor:"#64748b",flexShrink:0,cursor:"pointer",whiteSpace:"nowrap"}}>
-                    {c.icon} {c.nome}
-                  </button>
-                ))}
+              {/* Account selector — dropdown grouped by section */}
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                <span style={{fontSize:12,color:"#64748b",flexShrink:0}}>Conta:</span>
+                <select value={contaFiltro} onChange={e=>setContaFiltro(e.target.value)}
+                  style={{fontSize:13,padding:"7px 12px",flex:1,maxWidth:280}}>
+                  <option value="all">— Todas as contas —</option>
+                  {CONTA_SECOES.map(sec=>{
+                    const secContas=contas.filter(c=>c.secao===sec.id);
+                    if(!secContas.length) return null;
+                    return(
+                      <optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>
+                        {secContas.map(c=>(
+                          <option key={c.id} value={c.id}>{c.icon} {c.nome}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+                {contaFiltro!=="all"&&(()=>{
+                  const c=contas.find(x=>x.id===contaFiltro);
+                  return c?<span style={{fontSize:12,color:c.cor,fontWeight:600}}>{fE(c.saldo)}</span>:null;
+                })()}
               </div>
-              <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{transMes.length} movimentos · {MESES[fMes]} {fAno} {contaFiltro!=="all"?`· ${contas.find(c=>c.id===contaFiltro)?.nome}`:""}</p>
+              <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{transMes.length} movimentos · {MESES[fMes]} {fAno}</p>
 
               {/* Add manual transaction */}
               <div style={{marginBottom:12}}>
