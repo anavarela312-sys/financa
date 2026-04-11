@@ -279,16 +279,16 @@ const PATRIMONIO_ATIVOS = [
   // Imobiliário
   { id:"casa",     label:"Casa Própria",          grupo:"imovel",      icon:"🏠", color:"#3b82f6", fixo:true },
   { id:"imovel2",  label:"Investimento Imobiliário",grupo:"imovel",    icon:"🏗️", color:"#6366f1", fixo:false },
-  // PPR / Investimentos
-  { id:"ppr_lex",  label:"PPR Alves Ribeiro — Lexie",grupo:"investimento",icon:"👧",color:"#ec4899" },
-  { id:"ppr_opt_ana",label:"PPR Optimize Ana",    grupo:"investimento",icon:"📊", color:"#06b6d4", contaId:"opt_ana" },
-  { id:"ppr_opt_joa",label:"PPR Optimize João",   grupo:"investimento",icon:"📊", color:"#0284c7", contaId:"opt_joa" },
-  { id:"ppr_grow_ana",label:"PPR Grow Ana",        grupo:"investimento",icon:"🌱", color:"#10b981" },
-  { id:"ppr_grow_joa",label:"PPR Grow João",       grupo:"investimento",icon:"🌱", color:"#059669" },
-  { id:"xtb",      label:"Investimento em Bolsa (XTB)",grupo:"investimento",icon:"📈",color:"#f59e0b", contaId:"xtb" },
+  // PPR / Investimentos — v0=valor inicial Mar 2026, mensal=contribuição mensal
+  { id:"ppr_lex",     label:"PPR Alves Ribeiro — Lexie",  grupo:"investimento",icon:"👧",color:"#ec4899", contaId:"ppr_lex",  v0:1856.85, mensal:0 },
+  { id:"ppr_opt_ana", label:"PPR Optimize Ana",            grupo:"investimento",icon:"📊",color:"#06b6d4", contaId:"opt_ana",  v0:446.97,  mensal:25 },
+  { id:"ppr_opt_joa", label:"PPR Optimize João",           grupo:"investimento",icon:"📊",color:"#0284c7", contaId:"opt_joa",  v0:546.57,  mensal:30 },
+  { id:"ppr_grow_ana",label:"PPR Grow Ana",                grupo:"investimento",icon:"🌱",color:"#10b981", contaId:"sag_ana",  v0:3077.02, mensal:0 },
+  { id:"ppr_grow_joa",label:"PPR Grow João",               grupo:"investimento",icon:"🌱",color:"#059669", contaId:"sag_joa",  v0:1278.74, mensal:0 },
+  { id:"xtb",         label:"Investimento em Bolsa (XTB)", grupo:"investimento",icon:"📈",color:"#f59e0b", contaId:"xtb",      v0:1439.00, mensal:100 },
   // Liquidez
-  { id:"aforro",   label:"Conta Aforro",           grupo:"liquidez",   icon:"🏦", color:"#64748b" },
-  { id:"apparte_total",label:"Apparte (total)",    grupo:"liquidez",   icon:"💰", color:"#22c55e" },
+  { id:"aforro",      label:"Conta Aforro",          grupo:"liquidez",   icon:"🏦", color:"#64748b", contaId:"aforro" },
+  { id:"apparte_total",label:"Apparte (total)",       grupo:"liquidez",   icon:"💰", color:"#22c55e", contaId:"cx_meal" },
 ];
 
 const PATRIMONIO_PASSIVOS = [
@@ -1898,36 +1898,55 @@ export default function App(){
                 {/* Gráfico linhas */}
                 <div style={{marginTop:8}}>
                   <p style={{fontSize:12,fontWeight:600,color:"#fff",marginBottom:8}}>Projecção de crescimento</p>
-                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{overflow:"visible"}}>
-                    {/* Grid horizontal */}
-                    {yTicks.map(v=>(
-                      <g key={v}>
-                        <line x1={pad.l} y1={toY(v)} x2={W-pad.r} y2={toY(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
-                        <text x={pad.l-4} y={toY(v)+4} textAnchor="end" fill="#64748b" fontSize="9">{fmtY(v)}</text>
-                      </g>
-                    ))}
-                    {/* Grid vertical + X labels */}
-                    {xTicks.map(yr=>(
-                      <g key={yr}>
-                        <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke="#1e3048" strokeWidth="1" strokeDasharray="2,4"/>
-                        <text x={toX(yr)} y={H-pad.b+12} textAnchor="middle" fill="#64748b" fontSize="9">{yr}a</text>
-                      </g>
-                    ))}
-                    {/* Linhas LF e FIRE */}
-                    <line x1={pad.l} y1={toY(500000)} x2={W-pad.r} y2={toY(500000)} stroke="#06b6d4" strokeWidth="1" strokeDasharray="4,3" opacity="0.5"/>
-                    <text x={W-pad.r+2} y={toY(500000)+4} fill="#06b6d4" fontSize="8">LF</text>
-                    <line x1={pad.l} y1={toY(1050000)} x2={W-pad.r} y2={toY(1050000)} stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4,3" opacity="0.5"/>
-                    <text x={W-pad.r+2} y={toY(1050000)+4} fill="#8b5cf6" fontSize="8">FIRE</text>
-                    {/* Cenário lines */}
-                    {chartPts.map(s=>(
-                      <polyline key={s.taxa}
-                        points={s.pts.map(p=>`${toX(p.yr)},${toY(p.val)}`).join(" ")}
-                        fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round"/>
-                    ))}
-                    {/* Eixos */}
-                    <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
-                    <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
-                  </svg>
+                  {(()=>{
+                    // Better Y scale
+                    const maxChartVal=Math.max(...chartPts.find(s=>s.taxa===10).pts.map(p=>p.val));
+                    const mag=Math.pow(10,Math.floor(Math.log10(maxChartVal)));
+                    const niceMax=Math.ceil(maxChartVal/mag)*mag;
+                    const yStep=niceMax/5;
+                    const yTicks2=Array.from({length:6},(_,i)=>i*yStep);
+                    const toY2=v=>pad.t+((1-v/niceMax)*(H-pad.t-pad.b));
+                    const fmtY2=v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?(v/1000).toFixed(0)+"k":"0";
+                    return(
+                      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{overflow:"visible"}}>
+                        {/* Grid horizontal + Y labels */}
+                        {yTicks2.map(v=>(
+                          <g key={v}>
+                            <line x1={pad.l} y1={toY2(v)} x2={W-pad.r} y2={toY2(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
+                            <text x={pad.l-5} y={toY2(v)+4} textAnchor="end" fill="#94a3b8" fontSize="10" fontWeight="500">{fmtY2(v)}</text>
+                          </g>
+                        ))}
+                        {/* Grid vertical + X labels */}
+                        {xTicks.map(yr=>(
+                          <g key={yr}>
+                            <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke="#1e3048" strokeWidth="1" strokeDasharray="2,4"/>
+                            <text x={toX(yr)} y={H-pad.b+13} textAnchor="middle" fill="#94a3b8" fontSize="10">{yr}a</text>
+                          </g>
+                        ))}
+                        {/* LF e FIRE lines */}
+                        <line x1={pad.l} y1={toY2(500000)} x2={W-pad.r} y2={toY2(500000)} stroke="#06b6d4" strokeWidth="1" strokeDasharray="4,3" opacity="0.6"/>
+                        <text x={W-pad.r+3} y={toY2(500000)+4} fill="#06b6d4" fontSize="9">LF</text>
+                        <line x1={pad.l} y1={toY2(1050000)} x2={W-pad.r} y2={toY2(1050000)} stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4,3" opacity="0.6"/>
+                        <text x={W-pad.r+3} y={toY2(1050000)+4} fill="#8b5cf6" fontSize="9">FIRE</text>
+                        {/* Cenário lines + endpoint labels */}
+                        {chartPts.map(s=>{
+                          const lastPt=s.pts[s.pts.length-1];
+                          return(
+                            <g key={s.taxa}>
+                              <polyline
+                                points={s.pts.map(p=>`${toX(p.yr)},${toY2(p.val)}`).join(" ")}
+                                fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round"/>
+                              <circle cx={toX(lastPt.yr)} cy={toY2(lastPt.val)} r="4" fill={s.color} stroke="#070d1a" strokeWidth="2"/>
+                              <text x={toX(lastPt.yr)-5} y={toY2(lastPt.val)-10} textAnchor="end" fill={s.color} fontSize="10" fontWeight="700">{fmtY2(lastPt.val)}</text>
+                            </g>
+                          );
+                        })}
+                        {/* Eixos */}
+                        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
+                        <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
+                      </svg>
+                    );
+                  })()}
                   {/* Legenda */}
                   <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:6}}>
                     {cenarios.map(s=>(
@@ -2391,8 +2410,8 @@ export default function App(){
                                     <input type="number" value={d.investido} placeholder="—"
                                       onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
                                       style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
-                                    {contaAuto&&<button onClick={()=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:contaAuto.saldo}}}))}
-                                      style={{position:"absolute",right:-28,top:2,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"none",borderRadius:4,padding:"2px 5px",fontSize:9,cursor:"pointer"}} title={`Usar saldo ${contaAuto.nome}`}>↑</button>}
+                                    {contaAuto&&<button onClick={()=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:contaAuto.saldo}}}))}
+                                      style={{position:"absolute",right:-28,top:2,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"none",borderRadius:4,padding:"2px 5px",fontSize:9,cursor:"pointer"}} title={`Preencher Investido: ${contaAuto.nome} (${contaAuto.saldo.toFixed(2)}€)`}>↑</button>}
                                   </div>
                                 );
                               })():<span style={{color:"#64748b",fontSize:12}}>—</span>}
