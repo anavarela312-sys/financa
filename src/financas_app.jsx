@@ -80,9 +80,9 @@ function useIsMobile() {
 
 // ── DEFAULT CATS (user can add more) ─────────────────────────
 const DEFAULT_CATS = {
-  "Casa":              { icon:"🏠", color:"#3b82f6", subs:["Renda","Electricidade","Gás","Água","Condomínio","Seguro Casa","Seguro Vida","Limpeza","Engomadoria","Mobília","Reparações","Vários"] },
+  "Casa":              { icon:"🏠", color:"#3b82f6", subs:["Água","Condomínio","Electricidade","Engomadoria","Gás","Limpeza","Mobília","Reparações","Renda","Seguro Casa","Seguro Vida","Supermercado","Vários"] },
   "Saúde":             { icon:"🏥", color:"#ef4444", subs:["Consultas","Medicamentos","Estética / Cuidados Pessoais","Ginásio","Exames","Fisioterapia","Transporte"] },
-  "Alimentação":       { icon:"🍽️", color:"#f97316", subs:["Supermercado","Cafetaria","Restauração"] },
+  "Alimentação":       { icon:"🍽️", color:"#f97316", subs:["Cafetaria","Restauração"] },
   "Animais":           { icon:"🐾", color:"#84cc16", subs:["Ração e outros","Veterinário","Seguro"] },
   "Carro":             { icon:"🚗", color:"#6366f1", subs:["Via Verde","Combustível","Limpeza","Reparações"] },
   "Lexie":             { icon:"👧", color:"#ec4899", subs:["Piscina","Actividades extra curriculares","Roupa","Saúde","Vários"] },
@@ -500,13 +500,24 @@ export default function App(){
   const [importMsg,setImportMsg]=useState("");
   const [simExtra,setSimExtra]=useState(0);
   const [planoTab,setPlanoTab]=useState("plano");
+  const [simCapital,setSimCapital]=useState(1500);
+  const [simMensal,setSimMensal]=useState(100);
+  const [simTaxa,setSimTaxa]=useState(8);
+  const [patSubTab,setPatSubTab]=useState("geral");
+  const [invSelected,setInvSelected]=useState("xtb");
   const [newSnap,setNewSnap]=useState("");
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
 
   const [addManual,setAddManual]=useState(false);
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
+  // Sync contaOrigem with contaFiltro when it changes
+  useEffect(()=>{
+    if(contaFiltro&&contaFiltro!=="all") setManualT(t=>({...t,contaOrigem:contaFiltro}));
+  },[contaFiltro]);
   const [search,setSearch]=useState("");
+  const [globalSearch,setGlobalSearch]=useState("");
+  const [showGlobalSearch,setShowGlobalSearch]=useState(false);
   const [searchVal,setSearchVal]=useState("");
   const [contaFiltro,setContaFiltro]=useState("mill"); // selected account in transactions
   const [splitModal,setSplitModal]=useState(null); // transaction id to split
@@ -534,21 +545,30 @@ export default function App(){
     const existingIds=new Set(trans.map(t=>t.desc+t.data+t.val));
     const novasFiltradas=novas.filter(t=>!existingIds.has(t.desc+t.data+t.val));
     if(!novasFiltradas.length){setImportMsg("Sem movimentos novos — já importados anteriormente.");return;}
+    // Calculate date range
+    const datas=novasFiltradas.map(t=>t.data).sort();
+    const dataMin=datas[0].slice(5).split("-").reverse().join("/");
+    const dataMax=datas[datas.length-1].slice(5).split("-").reverse().join("/");
     setPend(novasFiltradas);
     setTab("categorizar");
     const preench=novasFiltradas.filter(t=>t.ok).length;
     const semCat=novasFiltradas.filter(t=>!t.ok).length;
-    setImportMsg(`${novasFiltradas.length} movimentos para rever · ${preench} pré-preenchidos · ${semCat} por categorizar`);
+    setImportMsg(`${novasFiltradas.length} movimentos · ${dataMin} a ${dataMax} · ${preench} pré-preenchidos · ${semCat} por categorizar`);
   },[cats,trans,setPend]);
 
   const handleFile=f=>{if(!f)return;const r=new FileReader();r.onload=e=>processar(e.target.result);r.readAsText(f,"utf-8");};
   const isInt=t=>t.cat==="Transferência Interna"||t.cat==="Poupança";
 
+  // All transactions in month (for budget/summary)
+  const transMesTodos=trans.filter(t=>{
+    const[y,m]=t.data.split("-");
+    return parseInt(m)-1===fMes&&parseInt(y)===fAno;
+  });
+  // Filtered by account (for transaction list)
   const transMes=trans.filter(t=>{
     const[y,m]=t.data.split("-");
     const inMonth=parseInt(m)-1===fMes&&parseInt(y)===fAno;
     if(!inMonth) return false;
-    // Filter by account: match contaId or contaOrigem
     if(contaFiltro==="all") return true;
     return (t.contaId||t.contaOrigem||"mill")===contaFiltro;
   });
@@ -574,20 +594,20 @@ export default function App(){
     }).reverse();
   },[transMes,trans,contas,fMes,fAno]);
 
-  const desp=transMes.filter(t=>t.tipo==="d"&&!isInt(t));
-  const rec=transMes.filter(t=>t.tipo==="c"&&!isInt(t));
+  const desp=transMesTodos.filter(t=>t.tipo==="d"&&!isInt(t));
+  const rec=transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t));
   const totD=desp.reduce((a,t)=>a+t.val,0);
   const totR=rec.reduce((a,t)=>a+t.val,0);
 
   const catData=useMemo(()=>{
     const d={};
-    transMes.filter(t=>!isInt(t)).forEach(t=>{
+    transMesTodos.filter(t=>!isInt(t)).forEach(t=>{
       if(!d[t.cat])d[t.cat]={out:0,in:0,subs:{}};
       if(t.tipo==="d"){d[t.cat].out+=t.val;if(!d[t.cat].subs[t.sub])d[t.cat].subs[t.sub]=0;d[t.cat].subs[t.sub]+=t.val;}
       else d[t.cat].in+=t.val;
     });
     return d;
-  },[transMes]);
+  },[transMesTodos]);
 
   const alerts=useMemo(()=>
     Object.entries(catData).filter(([cat])=>orcMes[cat]).map(([cat,d])=>{
@@ -607,9 +627,15 @@ export default function App(){
       .slice(0,8)
   ,[catData,cats]);
 
-  const appSaldo=contas.find(c=>c.id==="app")?.saldo||1350;
-  const progressL1=Math.min((appSaldo/10500)*100,100);
-  const monthsLeft=Math.max(0,Math.ceil((10500-appSaldo)/(800+simExtra)));
+  const appSaldo=contas.find(c=>c.id==="cx_meal")?.saldo||1350; // Mealheiro
+  const caSaldo=contas.find(c=>c.id==="ca")?.saldo||0; // Certificados de Aforro (conta virtual)
+  // Level 1: Apparte 1500 + CA 9000 = 10500
+  const L1_APPARTE=1500; const L1_CA=9000; const L1_TOTAL=10500;
+  const L1_INVEST=1500; // XTB already invested
+  const progressApparte=Math.min((appSaldo/L1_APPARTE)*100,100);
+  const progressCA=Math.min((caSaldo/L1_CA)*100,100);
+  const progressL1=Math.min(((appSaldo+caSaldo)/L1_TOTAL)*100,100);
+  const monthsLeft=Math.max(0,Math.ceil((L1_TOTAL-appSaldo-caSaldo)/800));
   const latestSnap=snaps[snaps.length-1];
   const deviation=latestSnap.actual-latestSnap.planned;
   // Auto-calculate Millennium saldo from all confirmed transactions
@@ -635,9 +661,33 @@ export default function App(){
     setContas(prev => prev.map(c => c.id === "mill" ? {...c, saldo: millSaldo} : c));
   }, [millSaldo]);
 
+  // Migrate Alimentação/Supermercado → Casa/Supermercado
+  useEffect(() => {
+    const needs = trans.filter(t=>t.cat==="Alimentação"&&t.sub==="Supermercado");
+    if(!needs.length) return;
+    setTrans(prev=>prev.map(t=>
+      t.cat==="Alimentação"&&t.sub==="Supermercado"
+        ? {...t, cat:"Casa", sub:"Supermercado"}
+        : t
+    ));
+  }, []);
+
   const patrimonioTotal=contas.reduce((a,c)=>a+c.saldo,0);
 
   // Filtered transactions for list
+  const globalResults=useMemo(()=>{
+    if(!globalSearch||globalSearch.length<2) return [];
+    const q=globalSearch.toLowerCase();
+    return trans.filter(t=>
+      t.desc.toLowerCase().includes(q)||
+      (t.ent||"").toLowerCase().includes(q)||
+      (t.cat||"").toLowerCase().includes(q)||
+      (t.sub||"").toLowerCase().includes(q)||
+      (t.nota||"").toLowerCase().includes(q)||
+      String(t.val).includes(q)
+    ).sort((a,b)=>b.data.localeCompare(a.data)).slice(0,50);
+  },[trans,globalSearch]);
+
   const filteredTrans=useMemo(()=>{
     return transMesWithBalance.filter(t=>{
       if(search&&!t.desc.toLowerCase().includes(search.toLowerCase())&&!t.ent.toLowerCase().includes(search.toLowerCase())&&!t.cat.toLowerCase().includes(search.toLowerCase())) return false;
@@ -703,6 +753,19 @@ export default function App(){
   const delT=id=>{setTrans(prev=>prev.filter(t=>t.id!==id));setEditId(null);};
 
   const exportJSON=()=>{const blob=new Blob([JSON.stringify({trans,pend,contas,orcs,snaps,cats},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="financa_backup.json";a.click();};
+  const exportExcel=()=>{
+    const headers=["Data","Entidade","Descricao","Categoria","Subcategoria","Tipo","Valor","Nota","Conta"];
+    const dataRows=[...trans].sort((a,b)=>b.data.localeCompare(a.data)).map(t=>{
+      const conta=contas.find(c=>c.id===(t.contaId||t.contaOrigem||"mill"));
+      return [t.data,t.ent||"",t.desc,t.cat||"",t.sub||"",t.tipo==="c"?"Credito":"Debito",(t.tipo==="c"?1:-1)*t.val,t.nota||"",conta?.nome||"Millennium"];
+    });
+    const allRows=[headers,...dataRows];
+    const lines=allRows.map(r=>r.map(v=>{const s=String(v);return s.includes(";")||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;}).join(";"));
+    const csv=lines.join("\r\n");
+    const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="financa_"+new Date().toISOString().slice(0,10)+".csv";a.click();
+  };
   const importJSON=f=>{if(!f)return;const r=new FileReader();r.onload=e=>{try{const j=JSON.parse(e.target.result);if(j.trans)setTrans(j.trans);if(j.pend)setPend(j.pend);if(j.contas)setContas(j.contas);if(j.orcs)setOrcs(j.orcs);if(j.snaps)setSnaps(j.snaps);if(j.cats)setCats(j.cats);}catch{alert("Ficheiro inválido");}};r.readAsText(f);};
 
   const addNewCat=()=>{
@@ -717,9 +780,9 @@ export default function App(){
   const catTransactions=catModal?(()=>{
     if(catModal.includes("::")){
       const [cat,sub]=catModal.split("::");
-      return transMes.filter(t=>t.cat===cat&&t.sub===sub);
+      return transMesTodos.filter(t=>t.cat===cat&&t.sub===sub);
     }
-    return transMes.filter(t=>t.cat===catModal);
+    return transMesTodos.filter(t=>t.cat===catModal);
   })():[];
   const catModalLabel=catModal?.includes("::")?catModal.split("::")[1]:catModal;
   const catModalCat=catModal?.includes("::")?catModal.split("::")[0]:catModal;
@@ -761,8 +824,8 @@ export default function App(){
               <span style={{marginLeft:"auto",color:"#3b82f6",fontSize:18}}>›</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Saldo Abr</p><p style={{fontSize:16,fontWeight:600,color:"#3b82f6"}}>{fE0(totR-totD)}</p></div>
-              <div style={{background:"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Despesas</p><p style={{fontSize:16,fontWeight:600,color:"#ef4444"}}>{fE0(totD)}</p></div>
+              <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Saldo Abr</p><p style={{fontSize:16,fontWeight:600,color:"#3b82f6"}}>{fE(totR-totD)}</p></div>
+              <div style={{background:"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Despesas</p><p style={{fontSize:16,fontWeight:600,color:"#ef4444"}}>{fE(totD)}</p></div>
             </div>
           </div>
           <div onClick={()=>setScreen("plano")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
@@ -778,7 +841,7 @@ export default function App(){
             </div>
             <div style={{display:"flex",gap:6,padding:"6px 10px",background:deviation>=0?"rgba(34,197,94,0.1)":"rgba(239,68,68,0.1)",borderRadius:8}}>
               <span style={{fontSize:11}}>{deviation>=0?"✅":"⚠️"}</span>
-              <span style={{fontSize:11,color:deviation>=0?"#22c55e":"#ef4444"}}>{deviation>=0?"No plano":"Abaixo"} · {deviation>=0?"+":""}{fE0(deviation)}</span>
+              <span style={{fontSize:11,color:deviation>=0?"#22c55e":"#ef4444"}}>{deviation>=0?"No plano":"Abaixo"} · {deviation>=0?"+":""}{fE(deviation)}</span>
             </div>
           </div>
 
@@ -809,11 +872,11 @@ export default function App(){
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div style={{background:"rgba(34,197,94,0.08)",borderRadius:10,padding:"8px 12px"}}>
                     <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Receita {MESES[new Date().getMonth()]}</p>
-                    <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE0(rec)}</p>
+                    <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE(rec)}</p>
                   </div>
                   <div style={{background:res>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}>
                     <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Resultado</p>
-                    <p style={{fontSize:14,fontWeight:600,color:res>=0?"#22c55e":"#ef4444"}}>{fE0(res)}</p>
+                    <p style={{fontSize:14,fontWeight:600,color:res>=0?"#22c55e":"#ef4444"}}>{fE(res)}</p>
                   </div>
                   <div style={{background:"rgba(245,158,11,0.08)",borderRadius:10,padding:"8px 12px"}}>
                     <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Próx. Obrigação</p>
@@ -875,7 +938,7 @@ export default function App(){
                     <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
                       <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
                       {k.val!==null
-                        ? <p style={{fontSize:18,fontWeight:700,color:k.color}}>{k.val>=0?"+":""}{fE0(k.val)}</p>
+                        ? <p style={{fontSize:18,fontWeight:700,color:k.color}}>{k.val>=0?"+":""}{fE(k.val)}</p>
                         : <p style={{fontSize:14,color:"#64748b"}}>—</p>}
                       {k.isPct&&k.pct!==null&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
                     </div>
@@ -910,10 +973,10 @@ export default function App(){
                       return(
                         <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
                           <td style={{padding:"10px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
-                          <td style={{padding:"10px",color:"#22c55e"}}>{fE0(totalA)}</td>
-                          <td style={{padding:"10px",color:"#ef4444"}}>{fE0(totalP)}</td>
-                          <td style={{padding:"10px",fontWeight:700,color:"#3b82f6"}}>{fE0(pat)}</td>
-                          <td style={{padding:"10px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE0(diff)}`}</td>
+                          <td style={{padding:"10px",color:"#22c55e"}}>{fE(totalA)}</td>
+                          <td style={{padding:"10px",color:"#ef4444"}}>{fE(totalP)}</td>
+                          <td style={{padding:"10px",fontWeight:700,color:"#3b82f6"}}>{fE(pat)}</td>
+                          <td style={{padding:"10px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
                           <td style={{padding:"10px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
                         </tr>
                       );
@@ -970,7 +1033,7 @@ export default function App(){
                       {!item.fixo&&d.valor&&d.investido&&(
                         <div style={{gridColumn:isMobile?"1":"3",display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}>
                           {(()=>{const ganho=(d.valor||0)-(d.investido||0);const pct=d.investido?ganho/d.investido*100:0;return(
-                            <span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE0(Math.abs(ganho))} ({pct>=0?"+":""}{pct.toFixed(1)}%)</span>
+                            <span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE(Math.abs(ganho))} ({pct>=0?"+":""}{pct.toFixed(1)}%)</span>
                           );})()}
                         </div>
                       )}
@@ -1051,9 +1114,9 @@ export default function App(){
                       <div style={{flex:1}}>
                         <p style={{fontSize:13,fontWeight:500,marginBottom:3}}>{item.label}</p>
                         <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                          {d.investido&&<span style={{fontSize:11,color:"#64748b"}}>Investido: {fE0(d.investido)}</span>}
-                          <span style={{fontSize:11,color:"#fff"}}>Atual: {fE0(d.valor)}</span>
-                          {d.investido&&<span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE0(Math.abs(ganho))} {pct!==null?`(${pct>=0?"+":""}${pct.toFixed(1)}%)`:""}</span>}
+                          {d.investido&&<span style={{fontSize:11,color:"#64748b"}}>Investido: {fE(d.investido)}</span>}
+                          <span style={{fontSize:11,color:"#fff"}}>Atual: {fE(d.valor)}</span>
+                          {d.investido&&<span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE(Math.abs(ganho))} {pct!==null?`(${pct>=0?"+":""}${pct.toFixed(1)}%)`:""}</span>}
                         </div>
                         {d.investido&&<PBar val={d.valor} max={Math.max(d.valor,d.investido)} color={ganho>=0?"#22c55e":"#ef4444"}/>}
                       </div>
@@ -1638,93 +1701,293 @@ export default function App(){
 
         {/* ── TAB: PLANO ── */}
         <div style={{display:planoTab==="plano"?"block":"none"}}>
+
+          {/* 4 níveis overview */}
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:16}}>
-            {PLAN_LEVELS.map(lv=>{const isA=lv.id===1;return(
-              <div key={lv.id} style={{background:"#0d1a2e",border:`1px solid ${isA?lv.color+"55":"#1e3048"}`,borderRadius:14,padding:12,opacity:isA?1:0.55}}>
-                <div style={{width:22,height:22,borderRadius:6,background:lv.color+"22",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><span style={{fontSize:10,fontWeight:700,color:lv.color}}>{lv.id}</span></div>
-                <p style={{fontSize:11,fontWeight:600,color:isA?lv.color:"#94a3b8",marginBottom:2}}>{lv.name}</p>
-                <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>{lv.desc}</p>
-                <p style={{fontSize:13,fontWeight:700,color:"#fff"}}>{fE0(lv.target)}</p>
-                {isA&&<p style={{fontSize:9,color:lv.color,marginTop:2,fontWeight:700,letterSpacing:1}}>ATIVO</p>}
-              </div>
-            );})}
+            {PLAN_LEVELS.map(lv=>{
+              const isA=lv.id===1;
+              // Determine progress for each level
+              const progVal=lv.id===1?appSaldo+caSaldo:0;
+              const pct=lv.id===1?progressL1:0;
+              // Dates
+              const datas={1:{ini:"Abr 2026",fim:"Nov 2026"},2:{ini:"Jan 2027",fim:"Fev 2028"},3:{ini:"Mar 2028",fim:"Out 2028"},4:{ini:"Nov 2028",fim:"IF"}};
+              return(
+                <div key={lv.id} style={{background:"#0d1a2e",border:`1px solid ${isA?lv.color+"55":"#1e3048"}`,borderRadius:14,padding:14,opacity:isA?1:0.5}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div style={{width:24,height:24,borderRadius:6,background:lv.color+"22",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <span style={{fontSize:10,fontWeight:700,color:lv.color}}>{lv.id}</span>
+                    </div>
+                    {isA&&<Chip label="ATIVO" color={lv.color} sm/>}
+                  </div>
+                  <p style={{fontSize:12,fontWeight:600,color:isA?lv.color:"#94a3b8",marginBottom:2}}>{lv.name}</p>
+                  <p style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4}}>{fE(lv.target)}</p>
+                  <div style={{fontSize:9,color:"#64748b",marginBottom:6}}>📅 {datas[lv.id].ini} → {datas[lv.id].fim}</div>
+                  {isA&&<>
+                    <PBar val={appSaldo+caSaldo} max={L1_TOTAL} color={lv.color} h={6}/>
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+                      <span style={{fontSize:9,color:"#64748b"}}>{progressL1.toFixed(1)}%</span>
+                      <span style={{fontSize:9,color:"#64748b"}}>≈{monthsLeft}m</span>
+                    </div>
+                  </>}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Nível 1 detalhe — 2 sub-barras */}
           <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Nível 1 — Fundo 3 Meses</p><Chip label="Abr–Nov 2026" color="#22c55e" sm/></div>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:12,color:"#94a3b8"}}>Apparte</span><span style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE0(appSaldo)} / {fE0(10500)}</span></div>
-            <PBar val={appSaldo} max={10500} color="#22c55e" h={10}/>
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}><span style={{fontSize:11,color:"#64748b"}}>{progressL1.toFixed(1)}%</span><span style={{fontSize:11,color:"#64748b"}}>≈ {monthsLeft} meses</span></div>
-          </Card>
-          <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>Simulador</p>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><Lbl>Poupança extra/mês</Lbl><span style={{fontSize:16,fontWeight:600,color:"#3b82f6"}}>+{fE0(simExtra)}</span></div>
-            <input type="range" min={0} max={500} step={50} value={simExtra} onChange={e=>setSimExtra(parseInt(e.target.value))} style={{background:"none",border:"none",padding:0,cursor:"pointer",width:"100%",height:36,marginBottom:10}}/>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-              {[{label:"Total/mês",val:fE0(800+simExtra),color:"#22c55e"},{label:"Meses",val:`${monthsLeft}m`,color:"#3b82f6"},{label:"Conclusão",val:(()=>{const d=new Date(2026,3,1);d.setMonth(d.getMonth()+monthsLeft);return MESES[d.getMonth()]+" "+d.getFullYear();})(),color:"#f59e0b"}].map(k=>(
-                <div key={k.label} style={{background:"#070d1a",borderRadius:10,padding:10}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p><p style={{fontSize:14,fontWeight:600,color:k.color}}>{k.val}</p></div>
-              ))}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Nível 1 — Fundo de Emergência</p>
+              <span style={{fontSize:12,color:"#22c55e",fontWeight:600}}>{fE(appSaldo+caSaldo)} / {fE(L1_TOTAL)}</span>
+            </div>
+            {/* Sub-barra Apparte */}
+            <div style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:13}}>🏺</span>
+                  <span style={{fontSize:12,color:"#e2e8f0"}}>Apparte Mealheiro</span>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#22c55e"}}>{fE(appSaldo)}</span>
+                  <span style={{fontSize:11,color:"#64748b"}}>/ {fE(L1_APPARTE)}</span>
+                  <span style={{fontSize:11,color:"#22c55e"}}>{progressApparte.toFixed(0)}%</span>
+                </div>
+              </div>
+              <PBar val={appSaldo} max={L1_APPARTE} color="#22c55e" h={8}/>
+              <p style={{fontSize:10,color:"#64748b",marginTop:3}}>Acesso imediato · Buffer de emergência</p>
+            </div>
+            {/* Sub-barra CA */}
+            <div style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:13}}>🏦</span>
+                  <span style={{fontSize:12,color:"#e2e8f0"}}>Certificados de Aforro</span>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#3b82f6"}}>{fE(caSaldo)}</span>
+                  <span style={{fontSize:11,color:"#64748b"}}>/ {fE(L1_CA)}</span>
+                  <span style={{fontSize:11,color:"#3b82f6"}}>{progressCA.toFixed(0)}%</span>
+                </div>
+              </div>
+              <PBar val={caSaldo} max={L1_CA} color="#3b82f6" h={8}/>
+              <p style={{fontSize:10,color:"#64748b",marginTop:3}}>Resgate após 3 meses · Taxa ~2,1% · Garantia Estado</p>
+            </div>
+            {/* Barra total */}
+            <div style={{padding:"10px 12px",background:"rgba(34,197,94,0.06)",borderRadius:10,marginTop:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                <span style={{fontSize:12,fontWeight:600,color:"#22c55e"}}>Total Nível 1</span>
+                <span style={{fontSize:12,color:"#64748b"}}>{progressL1.toFixed(1)}% · ≈ {monthsLeft} meses restantes</span>
+              </div>
+              <PBar val={appSaldo+caSaldo} max={L1_TOTAL} color="#22c55e" h={10}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+                <span style={{fontSize:11,color:"#64748b"}}>📅 Início: Abr 2026</span>
+                <span style={{fontSize:11,color:"#f59e0b"}}>🎯 Previsto: {(()=>{const d=new Date(2026,3,1);d.setMonth(d.getMonth()+monthsLeft);return MESES[d.getMonth()]+" "+d.getFullYear();})()}</span>
+              </div>
             </div>
           </Card>
+
+          {/* Histórico Nível 1 */}
           <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>Histórico mensal</p>
+            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>Histórico mensal — Apparte</p>
             {snaps.map((s,i)=>{const dev=s.actual-s.planned;return(
               <div key={i} style={{display:"flex",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #0d1a2e"}}>
-                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":"#64748b",minWidth:64}}>{s.label}</span>
-                <span style={{fontSize:12,color:"#64748b",minWidth:60}}>{fE0(s.planned)}</span>
-                <span style={{fontSize:13,fontWeight:600,color:"#fff",flex:1}}>{fE0(s.actual)}</span>
-                <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444"}}>{dev>=0?"+":""}{fE0(dev)}</span>
+                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":"#64748b",minWidth:70}}>{s.label}</span>
+                <span style={{fontSize:11,color:"#64748b",minWidth:70}}>plano {fE(s.planned)}</span>
+                <span style={{fontSize:13,fontWeight:600,color:"#fff",flex:1}}>{fE(s.actual)}</span>
+                <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444",fontWeight:600}}>{dev>=0?"+":""}{fE(dev)}</span>
               </div>
             );})}
             <div style={{display:"flex",gap:8,marginTop:12}}>
-              <input type="number" placeholder="Valor acumulado no Apparte (€)" value={newSnap} onChange={e=>setNewSnap(e.target.value)} style={{flex:1}}/>
+              <input type="number" placeholder="Valor actual no Apparte (€)" value={newSnap} onChange={e=>setNewSnap(e.target.value)} style={{flex:1}}/>
               <Btn variant="primary" style={{fontSize:12,padding:"10px 12px",whiteSpace:"nowrap"}} onClick={()=>{
                 const v=parseFloat(newSnap);if(isNaN(v))return;
                 const last=snaps[snaps.length-1];let nm=last.month+1,ny=last.year;if(nm>11){nm=0;ny++;}
-                const extras=(nm>=5?1000:0)+(nm>=7?1000:0)+(nm>=10?1000:0);
-                const pl=Math.min(1000+800*Math.max(0,nm-3+(ny-2026)*12)+extras,10500);
-                setSnaps(prev=>[...prev,{label:`${MESES[nm]} ${ny}`,year:ny,month:nm,planned:Math.max(1000,pl),actual:v,note:v>=pl?"✓ No plano":"⚠ Abaixo"}]);setNewSnap("");
+                const pl=Math.min(1000+800*Math.max(0,nm-3+(ny-2026)*12),L1_APPARTE);
+                setSnaps(prev=>[...prev,{label:`${MESES[nm]} ${ny}`,year:ny,month:nm,planned:Math.max(0,pl),actual:v,note:v>=pl?"✓ No plano":"⚠ Abaixo"}]);setNewSnap("");
               }}>Registar</Btn>
             </div>
           </Card>
+
+          {/* Nível 4 — projecção melhorada */}
           <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:4}}>Projeção — Nível 4</p>
-            <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Nov 2028 · 1.200 €/mês</p>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)",gap:8}}>
-              {[{age:"Aos 40",v5:"68k",v8:"72k",v10:"76k"},{age:"Aos 45",v5:"155k",v8:"180k",v10:"210k"},{age:"Aos 50",v5:"290k",v8:"350k",v10:"430k"},{age:"Aos 55",v5:"470k",v8:"640k",v10:"860k"},{age:"Aos 60",v5:"700k",v8:"1.05M",v10:"1.6M"}].map(r=>(
-                <div key={r.age} style={{background:"#070d1a",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-                  <p style={{fontSize:10,fontWeight:600,color:"#94a3b8",marginBottom:4}}>{r.age}</p>
-                  <p style={{fontSize:10,color:"#64748b",marginBottom:2}}>5%·{r.v5}</p>
-                  <p style={{fontSize:11,color:"#06b6d4",fontWeight:600,marginBottom:2}}>8%·{r.v8}</p>
-                  <p style={{fontSize:11,color:"#f59e0b",fontWeight:600}}>10%·{r.v10}</p>
+            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:4}}>Nível 4 — Independência Financeira</p>
+            <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Capital actual: {fE(L1_INVEST)} · 100€/mês até Out 2028, depois 1.200€/mês</p>
+
+            {/* Milestones */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+              {[{label:"Milestone 500k",val:500000,color:"#06b6d4"},{label:"Objetivo IF 1.05M",val:1050000,color:"#8b5cf6"}].map(m=>(
+                <div key={m.label} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 12px",border:`1px solid ${m.color}33`}}>
+                  <p style={{fontSize:10,color:"#64748b",marginBottom:3}}>{m.label}</p>
+                  <p style={{fontSize:16,fontWeight:700,color:m.color}}>{fE(m.val)}</p>
                 </div>
               ))}
             </div>
-            <div style={{marginTop:10,padding:"10px 12px",background:"rgba(34,197,94,0.08)",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontSize:12,color:"#94a3b8"}}>Objetivo IF · Regra 4%</span>
-              <span style={{fontSize:15,fontWeight:700,color:"#22c55e"}}>1.050.000 €</span>
-            </div>
+
+            {/* Projecção calculada */}
+            {(()=>{
+              // Phase 1: 100€/mês até Out 2028 = 30 meses from Apr 2026
+              // Phase 2: 1200€/mês from Nov 2028
+              const calc=(taxa)=>{
+                let cap=L1_INVEST;
+                const r=taxa/100/12;
+                // Phase 1: 30 months
+                for(let i=0;i<30;i++) cap=cap*(1+r)+100;
+                return cap;
+              };
+              const calcFull=(taxa,years)=>{
+                let cap=L1_INVEST;
+                const r=taxa/100/12;
+                for(let i=0;i<30;i++) cap=cap*(1+r)+100; // phase 1
+                const restMonths=years*12-30;
+                for(let i=0;i<restMonths;i++) cap=cap*(1+r)+1200; // phase 2
+                return cap;
+              };
+              const milestones500=(taxa)=>{
+                let cap=L1_INVEST; const r=taxa/100/12; let m=0;
+                while(cap<500000&&m<600){
+                  cap=cap*(1+r)+(m<30?100:1200);
+                  m++;
+                }
+                return m;
+              };
+              return(
+                <div>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:8,marginBottom:10}}>
+                    {[{taxa:5,color:"#64748b"},{taxa:8,color:"#06b6d4"},{taxa:10,color:"#f59e0b"}].map(s=>{
+                      const m500=milestones500(s.taxa);
+                      const dt500=new Date(2026,3,1);dt500.setMonth(dt500.getMonth()+m500);
+                      const v10=calcFull(s.taxa,10),v20=calcFull(s.taxa,20),v30=calcFull(s.taxa,30);
+                      return(
+                        <div key={s.taxa} style={{background:"#070d1a",borderRadius:10,padding:"12px"}}>
+                          <p style={{fontSize:11,fontWeight:700,color:s.color,marginBottom:8}}>Cenário {s.taxa}%</p>
+                          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                            <div style={{display:"flex",justifyContent:"space-between"}}>
+                              <span style={{fontSize:10,color:"#64748b"}}>500k em</span>
+                              <span style={{fontSize:10,fontWeight:600,color:s.color}}>{MESES[dt500.getMonth()]} {dt500.getFullYear()}</span>
+                            </div>
+                            <div style={{display:"flex",justifyContent:"space-between"}}>
+                              <span style={{fontSize:10,color:"#64748b"}}>10 anos</span>
+                              <span style={{fontSize:10,color:"#e2e8f0"}}>{v10>=1000000?(v10/1000000).toFixed(2)+"M":(v10/1000).toFixed(0)+"k"}</span>
+                            </div>
+                            <div style={{display:"flex",justifyContent:"space-between"}}>
+                              <span style={{fontSize:10,color:"#64748b"}}>20 anos</span>
+                              <span style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{v20>=1000000?(v20/1000000).toFixed(2)+"M":(v20/1000).toFixed(0)+"k"}</span>
+                            </div>
+                            <div style={{display:"flex",justifyContent:"space-between"}}>
+                              <span style={{fontSize:10,color:"#64748b"}}>30 anos</span>
+                              <span style={{fontSize:12,fontWeight:700,color:s.color}}>{v30>=1000000?(v30/1000000).toFixed(2)+"M":(v30/1000).toFixed(0)+"k"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{padding:"8px 12px",background:"rgba(34,197,94,0.06)",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
+                    <span style={{fontSize:11,color:"#94a3b8"}}>Objetivo IF · Regra 4%</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>1.050.000 €</span>
+                  </div>
+                </div>
+              );
+            })()}
           </Card>
+
+          {/* Sub-tab Simulador */}
+          <Card>
+            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>🧮 Simulador de Investimento</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+              <div><Lbl>Capital inicial (€)</Lbl>
+                <input type="number" value={simCapital} onChange={e=>setSimCapital(parseFloat(e.target.value)||0)} style={{fontSize:14}}/>
+              </div>
+              <div><Lbl>Mensal (€)</Lbl>
+                <input type="number" value={simMensal} onChange={e=>setSimMensal(parseFloat(e.target.value)||0)} style={{fontSize:14}}/>
+              </div>
+              <div><Lbl>Taxa anual (%)</Lbl>
+                <input type="number" value={simTaxa} step="0.5" onChange={e=>setSimTaxa(parseFloat(e.target.value)||0)} style={{fontSize:14}}/>
+              </div>
+            </div>
+            {/* Chart */}
+            {(()=>{
+              const anos=[5,10,15,20,25,30];
+              const calcSim=(anos)=>{let c=simCapital;const r=simTaxa/100/12;for(let i=0;i<anos*12;i++)c=c*(1+r)+simMensal;return c;};
+              const vals=anos.map(a=>({anos:a,val:calcSim(a)}));
+              const maxV=Math.max(...vals.map(v=>v.val),1);
+              return(
+                <div>
+                  <div style={{display:"flex",gap:6,alignItems:"flex-end",height:120,marginBottom:8}}>
+                    {vals.map(v=>(
+                      <div key={v.anos} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                        <p style={{fontSize:9,color:"#22c55e",fontWeight:600}}>{v.val>=1000000?(v.val/1000000).toFixed(1)+"M":(v.val/1000).toFixed(0)+"k"}</p>
+                        <div style={{width:"100%",background:"linear-gradient(to top,#22c55e,#06b6d4)",borderRadius:"4px 4px 0 0",height:`${(v.val/maxV)*90}px`,minHeight:4}}/>
+                        <p style={{fontSize:10,color:"#64748b"}}>{v.anos}a</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                    {[10,20,30].map(a=>{
+                      const v=calcSim(a);
+                      const inv=simCapital+simMensal*a*12;
+                      const ganho=v-inv;
+                      return(
+                        <div key={a} style={{background:"#070d1a",borderRadius:8,padding:"8px 10px"}}>
+                          <p style={{fontSize:9,color:"#64748b",marginBottom:3}}>Aos {a} anos</p>
+                          <p style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{v>=1000000?(v/1000000).toFixed(2)+"M":fE(v)}</p>
+                          <p style={{fontSize:9,color:"#64748b"}}>Investido: {fE(inv)}</p>
+                          <p style={{fontSize:9,color:"#06b6d4"}}>Ganho: +{ganho>=1000000?(ganho/1000000).toFixed(2)+"M":fE(ganho)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </Card>
+
         </div>
         </div>
 
         {/* ── TAB: PATRIMÓNIO ── */}
         <div style={{display:planoTab==="patrimonio"?"block":"none"}}>
 
-          {/* KPIs */}
-          {(()=>{
+          {/* Sub-tabs */}
+          <div style={{display:"flex",gap:0,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:3,marginBottom:14,width:"fit-content"}}>
+            {[{id:"geral",label:"📊 Geral"},{id:"investimentos",label:"📈 Investimentos"},{id:"registar",label:"✏️ Registar"}].map(t=>(
+              <button key={t.id} onClick={()=>setPatSubTab(t.id)}
+                style={{padding:"6px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:patSubTab===t.id?"rgba(168,85,247,0.3)":"none",color:patSubTab===t.id?"#fff":"#64748b",border:"none",cursor:"pointer"}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── SUB-TAB GERAL ── */}
+          {patSubTab==="geral"&&(()=>{
             const latest=patSnaps[patSnaps.length-1];
             const prev=patSnaps[patSnaps.length-2];
-            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Regista o primeiro mês abaixo.</p></Card>;
+            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Vai a ✏️ Registar para começar.</p></Card>;
             const tA=Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
             const tP=Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
             const pat=tA-tP;
             const prevPat=prev?Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0):null;
             const diff=prevPat!==null?pat-prevPat:null;
             const pct=prevPat?(diff/Math.abs(prevPat)*100):null;
-            return(
+            // Build 12-month line chart data
+            const patAno=patEdit?.slice(0,4)||new Date().getFullYear().toString();
+            const lineData=Array.from({length:12},(_,m)=>{
+              const mk=`${patAno}-${String(m+1).padStart(2,"0")}`;
+              const s=patSnaps.find(x=>x.mes===mk);
+              if(!s) return {mes:MESES[m].slice(0,3),val:null};
+              const a=Object.values(s.ativos||{}).reduce((x,v)=>x+(v.valor||0),0);
+              const p=Object.values(s.passivos||{}).reduce((x,v)=>x+v,0);
+              return {mes:MESES[m].slice(0,3),val:a-p};
+            });
+            const hasLine=lineData.some(d=>d.val!==null);
+            const maxLine=Math.max(...lineData.filter(d=>d.val!==null).map(d=>d.val),1);
+            const minLine=Math.min(...lineData.filter(d=>d.val!==null).map(d=>d.val),0);
+            const range=maxLine-minLine||1;
+            return(<>
+              {/* KPIs */}
               <div style={{marginBottom:14}}>
                 <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{latest.mes} · último registo</p>
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:10}}>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:14}}>
                   {[
                     {label:"Total Ativos",val:tA,color:"#22c55e"},
                     {label:"Total Passivos",val:tP,color:"#ef4444"},
@@ -1734,131 +1997,223 @@ export default function App(){
                     <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
                       <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
                       {k.val!==null&&k.val!==undefined
-                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||"#fff"}}>{k.val>=0?"+":""}{fE0(k.val)}</p>
+                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||"#fff"}}>{k.val>=0?"+":""}{fE(k.val)}</p>
                         :<p style={{fontSize:14,color:"#64748b"}}>—</p>}
                       {k.isVar&&k.pct!==null&&k.pct!==undefined&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
                     </div>
                   ))}
                 </div>
               </div>
-            );
-          })()}
 
-          {/* Evolution chart — bar chart */}
-          {patSnaps.length>1&&(()=>{
-            const maxPat=Math.max(...patSnaps.map(s=>{
-              const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
-              const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
-              return tA-tP;
-            }));
-            return(
-              <Card>
-                <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução do Património Líquido</p>
-                <div style={{display:"flex",gap:8,alignItems:"flex-end",height:100}}>
-                  {patSnaps.map((s,i)=>{
-                    const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
-                    const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
-                    const pat=tA-tP;
-                    const h=maxPat>0?(pat/maxPat)*80:0;
-                    const prev=patSnaps[i-1];
-                    const prevPat=prev?Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0):null;
-                    const diff=prevPat!==null?pat-prevPat:null;
-                    return(
-                      <div key={s.mes} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                        <p style={{fontSize:8,color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444",minHeight:10}}>{diff!==null?(diff>=0?"↑":"↓"):""}</p>
-                        <div style={{width:"100%",height:Math.max(h,3),background:"#a855f7",borderRadius:"5px 5px 0 0",transition:"height 0.5s"}}/>
-                        <p style={{fontSize:9,color:"#64748b"}}>{s.mes.slice(5)}</p>
-                        <p style={{fontSize:10,fontWeight:600,color:"#94a3b8"}}>{fE0(pat)}</p>
+              {/* Line chart 12 meses */}
+              {hasLine&&(
+                <Card>
+                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução do Património Líquido — {patAno}</p>
+                  <div style={{position:"relative",height:140,marginBottom:8}}>
+                    <svg width="100%" height="140" style={{overflow:"visible"}}>
+                      {/* Grid lines */}
+                      {[0,0.25,0.5,0.75,1].map(p=>(
+                        <line key={p} x1="0%" y1={`${(1-p)*120+10}px`} x2="100%" y2={`${(1-p)*120+10}px`}
+                          stroke="#1e3048" strokeWidth="1" strokeDasharray="4,4"/>
+                      ))}
+                      {/* Line path */}
+                      {(()=>{
+                        const pts=lineData.map((d,i)=>({
+                          x:(i/(lineData.length-1))*100,
+                          y:d.val!==null?((1-(d.val-minLine)/range)*110+10):null
+                        }));
+                        const segs=[];
+                        let cur=[];
+                        pts.forEach((p,i)=>{
+                          if(p.y!==null){cur.push(p);}
+                          else{if(cur.length>1)segs.push([...cur]);cur=[];}
+                        });
+                        if(cur.length>1)segs.push(cur);
+                        return segs.map((seg,si)=>(
+                          <polyline key={si}
+                            points={seg.map(p=>`${p.x}%,${p.y}px`).join(" ")}
+                            fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinejoin="round"/>
+                        ));
+                      })()}
+                      {/* Dots */}
+                      {lineData.map((d,i)=>{
+                        if(d.val===null) return null;
+                        const x=(i/(lineData.length-1))*100;
+                        const y=((1-(d.val-minLine)/range)*110+10);
+                        return(<circle key={i} cx={`${x}%`} cy={`${y}px`} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>);
+                      })}
+                    </svg>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                    {lineData.map((d,i)=>(
+                      <div key={i} style={{flex:1,textAlign:"center"}}>
+                        <p style={{fontSize:9,color:d.val!==null?"#64748b":"#1e3048"}}>{d.mes}</p>
+                        {d.val!==null&&<p style={{fontSize:9,fontWeight:600,color:"#a855f7"}}>{(d.val/1000).toFixed(0)}k</p>}
                       </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            );
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Tabela Excel com meses */}
+              {patSnaps.length>1&&(
+                <Card>
+                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Histórico</p>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:480}}>
+                      <thead>
+                        <tr style={{borderBottom:"1px solid #1e3048"}}>
+                          {["Mês","Ativos","Passivos","Pat. Líquido","Variação","Var %"].map(h=>(
+                            <th key={h} style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...patSnaps].reverse().map((s,i,arr)=>{
+                          const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
+                          const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
+                          const pat=tA-tP;
+                          const prevS=arr[i+1];
+                          const prevPat=prevS?Object.values(prevS.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prevS.passivos||{}).reduce((a,v)=>a+v,0):null;
+                          const diff=prevPat!==null?pat-prevPat:null;
+                          const pct=prevPat?(diff/Math.abs(prevPat)*100):null;
+                          return(
+                            <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
+                              <td style={{padding:"9px 8px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
+                              <td style={{padding:"9px 8px",color:"#22c55e"}}>{fE(tA)}</td>
+                              <td style={{padding:"9px 8px",color:"#ef4444"}}>{fE(tP)}</td>
+                              <td style={{padding:"9px 8px",fontWeight:700,color:"#a855f7"}}>{fE(pat)}</td>
+                              <td style={{padding:"9px 8px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
+                              <td style={{padding:"9px 8px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+            </>);
           })()}
 
-          {/* Investments growth detail */}
-          {patSnaps.length>0&&(()=>{
+          {/* ── SUB-TAB INVESTIMENTOS ── */}
+          {patSubTab==="investimentos"&&(()=>{
+            if(!patSnaps.length) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Vai a ✏️ Registar para começar.</p></Card>;
             const latest=patSnaps[patSnaps.length-1];
             const invItems=PATRIMONIO_ATIVOS.filter(a=>a.grupo==="investimento");
-            const hasData=invItems.some(a=>latest.ativos?.[a.id]?.valor);
-            if(!hasData) return null;
-            return(
-              <Card>
-                <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>📈 Crescimento dos Investimentos</p>
+            return(<>
+              {/* Grid geral */}
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:10,marginBottom:14}}>
                 {invItems.map(item=>{
-                  const latest_d=latest.ativos?.[item.id];
-                  if(!latest_d?.valor) return null;
-                  // Find first snapshot with this investment
-                  const history=patSnaps.map(s=>({mes:s.mes,d:s.ativos?.[item.id]})).filter(x=>x.d?.valor);
-                  const first=history[0];
-                  const ganhoTotal=(latest_d.valor||0)-(latest_d.investido||0);
-                  const pctTotal=latest_d.investido?ganhoTotal/latest_d.investido*100:null;
-                  const ganhoMes=history.length>1?(latest_d.valor-(history[history.length-2]?.d?.valor||latest_d.valor)):null;
+                  const d=latest.ativos?.[item.id];
+                  if(!d?.valor) return null;
+                  // Get value from contas if available
+                  const contaMatch=contas.find(c=>c.nome.toLowerCase().includes(item.label.toLowerCase().split(" ").pop().toLowerCase()));
+                  const valorReal=contaMatch?contaMatch.saldo:d.valor;
+                  const history=patSnaps.map(s=>s.ativos?.[item.id]?.valor||null);
+                  const prev=history[history.length-2];
+                  const ganhoMes=prev!==null&&prev!==undefined?valorReal-prev:null;
+                  const ganhoTotal=d.investido?valorReal-d.investido:null;
+                  const pctTotal=d.investido&&d.investido>0?ganhoTotal/d.investido*100:null;
                   return(
-                    <div key={item.id} style={{padding:"12px 0",borderBottom:"1px solid #0d1a2e"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                        <span style={{fontSize:18,width:28}}>{item.icon}</span>
-                        <div style={{flex:1}}>
-                          <p style={{fontSize:13,fontWeight:500}}>{item.label}</p>
-                          <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:2}}>
-                            {latest_d.investido&&<span style={{fontSize:11,color:"#64748b"}}>Investido: {fE0(latest_d.investido)}</span>}
-                            <span style={{fontSize:11,color:"#e2e8f0"}}>Atual: {fE0(latest_d.valor)}</span>
-                            {ganhoTotal!==0&&<span style={{fontSize:11,color:ganhoTotal>=0?"#22c55e":"#ef4444",fontWeight:600}}>
-                              {ganhoTotal>=0?"↑":"↓"} {fE0(Math.abs(ganhoTotal))} {pctTotal!==null?`(${pctTotal>=0?"+":""}${pctTotal.toFixed(1)}%)`:""}
-                            </span>}
-                            {ganhoMes!==null&&<span style={{fontSize:11,color:ganhoMes>=0?"#22c55e":"#ef4444"}}>
-                              Mês: {ganhoMes>=0?"+":""}{fE0(ganhoMes)}
-                            </span>}
-                          </div>
-                        </div>
+                    <div key={item.id} style={{background:"#0d1a2e",border:`1px solid ${ganhoTotal>=0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:14,padding:14,cursor:"pointer",outline:invSelected===item.id?"2px solid #a855f7":"none"}}
+                      onClick={()=>setInvSelected(item.id)}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                        <span style={{fontSize:20}}>{item.icon}</span>
+                        <p style={{fontSize:12,fontWeight:600,color:"#e2e8f0"}}>{item.label}</p>
                       </div>
-                      {latest_d.investido&&<PBar val={latest_d.valor} max={Math.max(latest_d.valor,latest_d.investido)} color={ganhoTotal>=0?"#22c55e":"#ef4444"}/>}
+                      <p style={{fontSize:20,fontWeight:700,color:"#fff",marginBottom:4}}>{fE(valorReal)}</p>
+                      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                        {d.investido&&<span style={{fontSize:10,color:"#64748b"}}>invest. {fE(d.investido)}</span>}
+                        {ganhoTotal!==null&&<span style={{fontSize:11,fontWeight:600,color:ganhoTotal>=0?"#22c55e":"#ef4444"}}>{ganhoTotal>=0?"↑":"↓"}{fE(Math.abs(ganhoTotal))}{pctTotal!==null?` (${pctTotal>=0?"+":""}${pctTotal.toFixed(1)}%)`:""}</span>}
+                      </div>
+                      {ganhoMes!==null&&<p style={{fontSize:11,marginTop:4,color:ganhoMes>=0?"#22c55e":"#ef4444"}}>Mês: {ganhoMes>=0?"+":""}{fE(ganhoMes)}</p>}
                     </div>
                   );
-                })}
-              </Card>
-            );
+                }).filter(Boolean)}
+              </div>
+
+              {/* Gráfico de linhas do investimento seleccionado */}
+              {(()=>{
+                const item=invItems.find(a=>a.id===invSelected)||invItems[0];
+                if(!item) return null;
+                const contaMatch=contas.find(c=>c.nome.toLowerCase().includes(item.label.toLowerCase().split(" ").pop().toLowerCase()));
+                const realHistory=patSnaps.map(s=>{
+                  const v=s.ativos?.[item.id]?.valor;
+                  return{mes:s.mes,val:v||null};
+                }).filter(d=>d.val!==null);
+                if(!realHistory.length) return null;
+                const lastVal=contaMatch?contaMatch.saldo:realHistory[realHistory.length-1]?.val||0;
+                const lastInv=patSnaps[patSnaps.length-1]?.ativos?.[item.id]?.investido||0;
+                // Build projections from today
+                const projYears=20;
+                const projMonths=projYears*12;
+                const r5=5/100/12,r8=8/100/12,r10=10/100/12;
+                const monthly=item.id==="xtb"?100:0;
+                const proj=(rate)=>{
+                  const pts=[];let c=lastVal;
+                  for(let i=0;i<=projMonths;i+=12){
+                    pts.push({yr:i/12,val:c});
+                    for(let m=0;m<12;m++)c=c*(1+rate)+monthly;
+                  }
+                  return pts;
+                };
+                const p5=proj(r5),p8=proj(r8),p10=proj(r10);
+                const allVals=[...p10.map(p=>p.val),...realHistory.map(d=>d.val)];
+                const maxV=Math.max(...allVals,1);
+                const H=130;
+                const toY=v=>H-(v/maxV)*H;
+                const toX=(i,total)=>`${(i/(total-1))*100}%`;
+                return(
+                  <Card>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>{item.icon} {item.label} — Histórico + Projecção</p>
+                      <select value={invSelected} onChange={e=>setInvSelected(e.target.value)} style={{fontSize:11,padding:"4px 8px"}}>
+                        {invItems.filter(a=>patSnaps.some(s=>s.ativos?.[a.id]?.valor)).map(a=>(
+                          <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{position:"relative",height:H+20}}>
+                      <svg width="100%" height={H+20} style={{overflow:"visible"}}>
+                        {/* Grid */}
+                        {[0.25,0.5,0.75,1].map(p=>(
+                          <line key={p} x1="0" y1={toY(maxV*p)} x2="100%" y2={toY(maxV*p)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
+                        ))}
+                        {/* Proj lines */}
+                        {[{pts:p5,color:"#64748b",label:"5%"},{pts:p8,color:"#06b6d4",label:"8%"},{pts:p10,color:"#f59e0b",label:"10%"}].map(({pts,color,label})=>(
+                          <polyline key={label}
+                            points={pts.map((p,i)=>`${toX(i,pts.length)},${toY(p.val)}`).join(" ")}
+                            fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.7"/>
+                        ))}
+                        {/* Real line */}
+                        {realHistory.length>1&&(
+                          <polyline
+                            points={realHistory.map((d,i)=>`${toX(i,realHistory.length)},${toY(d.val)}`).join(" ")}
+                            fill="none" stroke="#a855f7" strokeWidth="2.5"/>
+                        )}
+                        {/* Real dots */}
+                        {realHistory.map((d,i)=>(
+                          <circle key={i} cx={toX(i,realHistory.length)} cy={toY(d.val)} r="3" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                        ))}
+                      </svg>
+                    </div>
+                    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
+                      {[{color:"#a855f7",label:"Real"},{color:"#64748b",label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true}].map(l=>(
+                        <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
+                          <div style={{width:16,height:2,background:l.color,borderRadius:1,opacity:l.dash?0.7:1,borderTop:l.dash?"2px dashed "+l.color:"none"}}/>
+                          <span style={{fontSize:10,color:"#64748b"}}>{l.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })()}
+            </>);
           })()}
 
-          {/* Historical table */}
-          {patSnaps.length>1&&(
-            <Card>
-              <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Histórico</p>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:480}}>
-                  <thead>
-                    <tr style={{borderBottom:"1px solid #1e3048"}}>
-                      {["Mês","Ativos","Passivos","Pat. Líquido","Variação","Var %"].map(h=>(
-                        <th key={h} style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...patSnaps].reverse().map((s,i,arr)=>{
-                      const tA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
-                      const tP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
-                      const pat=tA-tP;
-                      const prevS=arr[i+1];
-                      const prevPat=prevS?Object.values(prevS.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prevS.passivos||{}).reduce((a,v)=>a+v,0):null;
-                      const diff=prevPat!==null?pat-prevPat:null;
-                      const pct=prevPat?(diff/Math.abs(prevPat)*100):null;
-                      return(
-                        <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
-                          <td style={{padding:"9px 8px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
-                          <td style={{padding:"9px 8px",color:"#22c55e"}}>{fE0(tA)}</td>
-                          <td style={{padding:"9px 8px",color:"#ef4444"}}>{fE0(tP)}</td>
-                          <td style={{padding:"9px 8px",fontWeight:700,color:"#a855f7"}}>{fE0(pat)}</td>
-                          <td style={{padding:"9px 8px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE0(diff)}`}</td>
-                          <td style={{padding:"9px 8px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
+          {/* ── SUB-TAB REGISTAR ── */}
+          {patSubTab==="registar"&&<>
 
           {/* Register month form — Excel style */}
           <Card>
@@ -1924,11 +2279,19 @@ export default function App(){
                                 style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
                             </td>
                             <td style={{padding:"4px 8px",textAlign:"right"}}>
-                              {!item.fixo?(
-                                <input type="number" value={d.investido} placeholder="—"
-                                  onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
-                                  style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
-                              ):<span style={{color:"#64748b",fontSize:12}}>—</span>}
+                              {!item.fixo?(()=>{
+                                // Try to find matching account for auto-fill
+                                const contaAuto=contas.find(c=>item.contaId&&c.id===item.contaId);
+                                return(
+                                  <div style={{position:"relative"}}>
+                                    <input type="number" value={d.investido} placeholder="—"
+                                      onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
+                                      style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
+                                    {contaAuto&&<button onClick={()=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:contaAuto.saldo}}}))}
+                                      style={{position:"absolute",right:-28,top:2,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"none",borderRadius:4,padding:"2px 5px",fontSize:9,cursor:"pointer"}} title={`Usar saldo ${contaAuto.nome}`}>↑</button>}
+                                  </div>
+                                );
+                              })():<span style={{color:"#64748b",fontSize:12}}>—</span>}
                             </td>
                             <td style={{padding:"6px 8px",textAlign:"right"}}>
                               {ganho!==null?(
@@ -2010,6 +2373,8 @@ export default function App(){
             </button>
           </Card>
 
+          </>}
+
         </div>
         </div>
 
@@ -2031,7 +2396,34 @@ export default function App(){
           <div style={{width:210,background:"#0a1220",borderRight:"1px solid #1e3048",display:"flex",flexDirection:"column",padding:"16px 0",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto"}}>
             <div style={{padding:"0 16px 14px",borderBottom:"1px solid #1e3048",marginBottom:10}}>
               <button onClick={()=>setScreen("landing")} style={{background:"none",color:"#64748b",padding:"3px 0",border:"none",fontSize:11,marginBottom:8,cursor:"pointer"}}>← Hub</button>
-              <p style={{fontSize:15,fontWeight:600,color:"#fff",letterSpacing:-0.5}}>finança<span style={{color:"#3b82f6"}}>.</span></p>
+              <p style={{fontSize:15,fontWeight:600,color:"#fff",letterSpacing:-0.5,marginBottom:8}}>finança<span style={{color:"#3b82f6"}}>.</span></p>
+              <div style={{position:"relative"}}>
+                <input placeholder="🔍 Pesquisa global..." value={globalSearch}
+                  onChange={e=>{setGlobalSearch(e.target.value);setShowGlobalSearch(true);}}
+                  onFocus={()=>setShowGlobalSearch(true)}
+                  style={{fontSize:11,padding:"6px 10px",width:"100%"}}/>
+                {showGlobalSearch&&globalSearch.length>=2&&(
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:10,zIndex:100,maxHeight:300,overflowY:"auto",marginTop:4}}>
+                    {globalResults.length===0?<p style={{padding:"10px 12px",fontSize:12,color:"#64748b"}}>Sem resultados</p>:
+                    globalResults.map(t=>(
+                      <div key={t.id} style={{padding:"8px 12px",borderBottom:"1px solid #0a1220",cursor:"pointer"}} className="hrow"
+                        onClick={()=>{
+                          const[y,m]=t.data.split("-");
+                          setFAno(parseInt(y));setFMes(parseInt(m)-1);
+                          setTab("transacoes");setContaFiltro("all");
+                          setGlobalSearch("");setShowGlobalSearch(false);
+                        }}>
+                        <div style={{display:"flex",justifyContent:"space-between"}}>
+                          <p style={{fontSize:12,fontWeight:500,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"65%"}}>{t.ent||t.desc}</p>
+                          <p style={{fontSize:12,fontWeight:600,color:t.tipo==="c"?"#22c55e":"#e2e8f0"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
+                        </div>
+                        <p style={{fontSize:10,color:"#64748b"}}>{t.data} · {t.cat}{t.sub?` · ${t.sub}`:""}</p>
+                      </div>
+                    ))}
+                    <button onClick={()=>{setGlobalSearch("");setShowGlobalSearch(false);}} style={{width:"100%",padding:"6px",background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer"}}>Fechar</button>
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{display:"flex",gap:4,padding:"6px 10px 10px",borderBottom:"1px solid #1e3048",marginBottom:6}}>
               <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{flex:1,fontSize:12,padding:"5px 6px"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
@@ -2054,7 +2446,7 @@ export default function App(){
             <div style={{marginTop:"auto",padding:"12px 16px",borderTop:"1px solid #1e3048"}}>
               {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:"#64748b"},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:"#64748b"};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
               <p style={{fontSize:11,color:"#64748b"}}>Património</p>
-              <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE0(patrimonioTotal)}</p>
+              <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE(patrimonioTotal)}</p>
             </div>
           </div>
         )}
@@ -2089,7 +2481,7 @@ export default function App(){
                         style={{width:14,height:14,cursor:"pointer",accentColor:"#3b82f6",flexShrink:0}}/>
                       <div style={{flex:1,display:"flex",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setCatModal(a.cat)}>
                         <span style={{fontSize:12,color:"#94a3b8"}}>{cats[a.cat]?.icon} {a.cat}</span>
-                        <span style={{fontSize:12,color:a.pct>=100?"#ef4444":"#f59e0b",fontWeight:600}}>{a.pct.toFixed(0)}% · {fE0(a.net)}/{fE0(a.orc)}</span>
+                        <span style={{fontSize:12,color:a.pct>=100?"#ef4444":"#f59e0b",fontWeight:600}}>{a.pct.toFixed(0)}% · {fE(a.net)}/{fE(a.orc)}</span>
                       </div>
                     </div>
                   ))}
@@ -2100,7 +2492,7 @@ export default function App(){
                 {[{label:"Receitas",val:totR,color:"#22c55e"},{label:"Despesas",val:totD,color:"#ef4444"},{label:"Saldo",val:totR-totD,color:totR>=totD?"#22c55e":"#ef4444"},{label:"Movimentos",val:transMes.length,color:"#3b82f6",n:true}].map(k=>(
                   <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"12px 14px"}}>
                     <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
-                    <p style={{fontSize:18,fontWeight:600,color:k.color}}>{k.n?k.val:fE0(k.val)}</p>
+                    <p style={{fontSize:18,fontWeight:600,color:k.color}}>{k.n?k.val:fE(k.val)}</p>
                   </div>
                 ))}
               </div>
@@ -2162,7 +2554,7 @@ export default function App(){
                             <div style={{width:10,height:10,borderRadius:3,background:d.color,flexShrink:0}}/>
                             <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#e2e8f0"}}>{cats[d.cat]?.icon} {d.cat}</span>
                             <span style={{fontSize:11,color:"#64748b",flexShrink:0,width:32,textAlign:"right"}}>{pct}%</span>
-                            <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0,width:52,textAlign:"right"}}>{fE0(d.val)}</span>
+                            <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0,width:52,textAlign:"right"}}>{fE(d.val)}</span>
                           </div>
                         );
                       });})()}
@@ -2170,6 +2562,43 @@ export default function App(){
                   </div>
                 </Card>
               )}
+
+              {/* Evolução últimos 6 meses */}
+              {(()=>{
+                const meses=[];
+                for(let i=5;i>=0;i--){
+                  let m=fMes-i; let y=fAno;
+                  if(m<0){m+=12;y--;}
+                  const mk=`${y}-${String(m+1).padStart(2,"0")}`;
+                  const tM=trans.filter(t=>{const[ty,tm]=t.data.split("-");return parseInt(tm)-1===m&&parseInt(ty)===y;});
+                  const r=tM.filter(t=>t.tipo==="c"&&!isInt(t)).reduce((a,t)=>a+t.val,0);
+                  const d=tM.filter(t=>t.tipo==="d"&&!isInt(t)).reduce((a,t)=>a+t.val,0);
+                  meses.push({label:MESES[m],rec:r,desp:d,atual:m===fMes&&y===fAno});
+                }
+                const maxVal=Math.max(...meses.map(m=>Math.max(m.rec,m.desp)),1);
+                if(meses.every(m=>m.rec===0&&m.desp===0)) return null;
+                return(
+                  <Card>
+                    <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução — últimos 6 meses</p>
+                    <div style={{display:"flex",gap:8,alignItems:"flex-end",height:120}}>
+                      {meses.map((m,i)=>(
+                        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:90}}>
+                            <div style={{flex:1,background:"rgba(34,197,94,0.6)",borderRadius:"3px 3px 0 0",height:`${maxVal>0?(m.rec/maxVal)*90:0}px`,minHeight:m.rec>0?2:0,transition:"height 0.5s"}}/>
+                            <div style={{flex:1,background:"rgba(239,68,68,0.6)",borderRadius:"3px 3px 0 0",height:`${maxVal>0?(m.desp/maxVal)*90:0}px`,minHeight:m.desp>0?2:0,transition:"height 0.5s"}}/>
+                          </div>
+                          <p style={{fontSize:9,color:m.atual?"#f59e0b":"#64748b",fontWeight:m.atual?700:400}}>{m.label}</p>
+                          {m.atual&&<div style={{width:4,height:4,borderRadius:"50%",background:"#f59e0b"}}/>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:16,marginTop:8,justifyContent:"center"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:"rgba(34,197,94,0.6)"}}/><span style={{fontSize:10,color:"#64748b"}}>Receitas</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:"rgba(239,68,68,0.6)"}}/><span style={{fontSize:10,color:"#64748b"}}>Despesas</span></div>
+                    </div>
+                  </Card>
+                );
+              })()}
 
               {/* Monthly bar */}
               {transMes.length===0&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Sem dados. Importa o extrato.</p></Card>}
@@ -2189,12 +2618,21 @@ export default function App(){
                   const prevAno=fMes===0?fAno-1:fAno;
                   const prevKey=`${prevAno}-${String(prevMes+1).padStart(2,"0")}`;
                   const prevOrc=orcs[prevKey];
-                  return prevOrc&&Object.keys(prevOrc).length>0?(
+                  return prevOrc&&Object.keys(prevOrc).length>0?(<>
                     <Btn variant="ghost" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>{
                       if(confirm(`Copiar orçamento de ${MESES[prevMes]} ${prevAno} para este mês?`))
                         setOrcs(prev=>({...prev,[mesKey]:{...prevOrc}}));
                     }}>📋 Copiar de {MESES[prevMes]}</Btn>
-                  ):null;
+                    <Btn variant="ghost" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>{
+                      if(!confirm(`Copiar orçamento de ${MESES[prevMes]} ${prevAno} para TODOS os meses seguintes até Dez ${fAno}?`)) return;
+                      const updates={};
+                      for(let m=fMes;m<12;m++){
+                        const mk=`${fAno}-${String(m+1).padStart(2,"0")}`;
+                        updates[mk]={...prevOrc};
+                      }
+                      setOrcs(prev=>({...prev,...updates}));
+                    }}>📋📋 Copiar para todos os meses</Btn>
+                  </>):null;
                 })()}
               </div>
 
@@ -2208,7 +2646,7 @@ export default function App(){
                 ].map(k=>(
                   <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"10px 12px"}}>
                     <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
-                    <p style={{fontSize:15,fontWeight:600,color:k.color}}>{fE0(k.val)}</p>
+                    <p style={{fontSize:15,fontWeight:600,color:k.color}}>{fE(k.val)}</p>
                   </div>
                 ))}
               </div>
@@ -2218,12 +2656,12 @@ export default function App(){
                 <Card style={{marginBottom:12,background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.2)",cursor:"pointer"}} onClick={()=>setCatModal("Receita")}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                     <p style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>💵 Receitas <span style={{fontSize:10,color:"#64748b",fontWeight:400}}>— clica para ver movimentos</span></p>
-                    <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE0(totR)}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE(totR)}</span>
                   </div>
                   {Object.entries(catData["Receita"]?.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
                     <div key={sub} style={{display:"flex",justifyContent:"space-between",padding:"3px 0 3px 8px",borderTop:"1px solid rgba(34,197,94,0.1)"}}>
                       <span style={{fontSize:12,color:"#64748b"}}>{sub||"Outros"}</span>
-                      <span style={{fontSize:12,color:"#22c55e",fontWeight:500}}>{fE0(val)}</span>
+                      <span style={{fontSize:12,color:"#22c55e",fontWeight:500}}>{fE(val)}</span>
                     </div>
                   ))}
                 </Card>
@@ -2239,15 +2677,15 @@ export default function App(){
                       <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:4}} onClick={()=>setCatModal(cat)}>
                         <span style={{fontSize:16,width:22,flexShrink:0}}>{cfg.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,flex:1}}>{cat}</span>
-                        <span style={{fontSize:13,fontWeight:600,color:over?"#ef4444":orc===0?"#64748b":"#fff"}}>{fE0(net)}</span>
-                        {NET_CATS.has(cat)&&d.in>0&&<span style={{fontSize:10,color:"#22c55e"}}>-{fE0(d.in)}</span>}
+                        <span style={{fontSize:13,fontWeight:600,color:over?"#ef4444":orc===0?"#64748b":"#fff"}}>{fE(net)}</span>
+                        {NET_CATS.has(cat)&&d.in>0&&<span style={{fontSize:10,color:"#22c55e"}}>-{fE(d.in)}</span>}
                         {orcEdit?(
                           <input type="number" defaultValue={orc||""} placeholder="0" onClick={e=>e.stopPropagation()}
                             style={{width:70,textAlign:"right",padding:"4px 8px",fontSize:12}}
                             onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[cat]:v}}));}}/>
-                        ):<span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>/{fE0(orc)}</span>}
+                        ):<span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>/{fE(orc)}</span>}
                       </div>
-                      {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":"#64748b"}}>{over?`+${fE0(net-orc)} acima`:`${fE0(orc-net)} livre`}</span></div></>})()}
+                      {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":"#64748b"}}>{over?`+${fE(net-orc)} acima`:`${fE(orc-net)} livre`}</span></div></>})()}
                       {/* Subcategories with orçamento detail */}
                       {(Object.entries(d.subs||{}).filter(([,v])=>v>0).length>0||orcEdit)&&(
                         <div style={{marginTop:4}}>
@@ -2267,13 +2705,13 @@ export default function App(){
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
                                   <span style={{fontSize:11,color:"#94a3b8"}}>{sub||"Sem subcategoria"}</span>
                                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":"#e2e8f0"}}>{fE0(val)}</span>
+                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":"#e2e8f0"}}>{fE(val)}</span>
                                     {orcEdit?(
                                       <input type="number" defaultValue={subOrc||""} placeholder="0"
                                         onClick={e=>e.stopPropagation()}
                                         style={{width:65,textAlign:"right",padding:"2px 6px",fontSize:11}}
                                         onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[subOrcKey]:v}}));}}/>
-                                    ):(subOrc>0&&<span style={{fontSize:10,color:"#64748b"}}>/{fE0(subOrc)}</span>)}
+                                    ):(subOrc>0&&<span style={{fontSize:10,color:"#64748b"}}>/{fE(subOrc)}</span>)}
                                   </div>
                                 </div>
                                 <PBar val={val} max={barMax} color={barColor} h={3}/>
@@ -2327,10 +2765,7 @@ export default function App(){
                     );
                   })}
                 </select>
-                {contaFiltro!=="all"&&(()=>{
-                  const c=contas.find(x=>x.id===contaFiltro);
-                  return c?<span style={{fontSize:12,color:c.cor,fontWeight:600}}>{fE(c.saldo)}</span>:null;
-                })()}
+
               </div>
               <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{transMes.length} movimentos · {MESES[fMes]} {fAno}</p>
 
@@ -2355,7 +2790,7 @@ export default function App(){
                       <div><Lbl>Categoria</Lbl>
                         <select value={manualT.cat} onChange={e=>setManualT(t=>({...t,cat:e.target.value,sub:""}))}>
                           <option value="">Selecionar...</option>
-                          {Object.keys(cats).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
+                          {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
                         </select>
                       </div>
                       <div><Lbl>Subcategoria</Lbl>
@@ -2365,16 +2800,16 @@ export default function App(){
                         </select>
                       </div>
                       <div><Lbl>Conta {manualT.tipo==="d"?"(débito de)":"(crédito em)"}</Lbl>
-                        <select value={manualT.contaOrigem} onChange={e=>setManualT(t=>({...t,contaOrigem:e.target.value}))}>
+                        <select value={manualT.contaOrigem||contaFiltro} onChange={e=>setManualT(t=>({...t,contaOrigem:e.target.value}))}>
                           <option value="">— sem conta —</option>
-                          {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}
+                          {CONTA_SECOES.map(sec=>{const secC=contas.filter(c=>c.secao===sec.id);if(!secC.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{secC.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
                         </select>
                       </div>
                       {(manualT.cat==="Transferência Interna"||manualT.cat==="Poupança")&&(
                         <div><Lbl>Conta destino</Lbl>
                           <select value={manualT.contaDestino} onChange={e=>setManualT(t=>({...t,contaDestino:e.target.value}))}>
                             <option value="">— sem conta —</option>
-                            {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}
+                            {CONTA_SECOES.map(sec=>{const secC=contas.filter(c=>c.secao===sec.id);if(!secC.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{secC.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
                           </select>
                         </div>
                       )}
@@ -2433,8 +2868,8 @@ export default function App(){
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
                           <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{label}</span>
                           <div style={{display:"flex",gap:6}}>
-                            {entDia>0&&<span style={{fontSize:10,color:"#22c55e"}}>+{fE0(entDia)}</span>}
-                            {saiDia>0&&<span style={{fontSize:10,color:"#ef4444"}}>-{fE0(saiDia)}</span>}
+                            {entDia>0&&<span style={{fontSize:10,color:"#22c55e"}}>+{fE(entDia)}</span>}
+                            {saiDia>0&&<span style={{fontSize:10,color:"#ef4444"}}>-{fE(saiDia)}</span>}
                           </div>
                         </div>
                         <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>{fE(saldoDia)}</span>
@@ -2579,13 +3014,13 @@ export default function App(){
                               <div><Lbl>Conta origem (débito)</Lbl>
                                 <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
                                   <option value="">— selecionar —</option>
-                                  {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
+                                  {CONTA_SECOES.map(sec=>{const secC=contas.filter(c=>c.secao===sec.id);if(!secC.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{secC.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
                                 </select>
                               </div>
                               <div><Lbl>Conta destino (crédito)</Lbl>
                                 <select value={ed.contaDestino||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaDestino:e.target.value}}))}>
                                   <option value="">— selecionar —</option>
-                                  {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
+                                  {CONTA_SECOES.map(sec=>{const secC=contas.filter(c=>c.secao===sec.id);if(!secC.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{secC.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
                                 </select>
                               </div>
                             </div>
@@ -2593,7 +3028,7 @@ export default function App(){
                             <div style={{gridColumn:"1/-1"}}><Lbl>{t.tipo==="d"?"Conta (débito de)":"Conta (crédito em)"}</Lbl>
                               <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
                                 <option value="">— não actualizar saldo —</option>
-                                {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE0(c.saldo)})</option>)}
+                                {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE(c.saldo)})</option>)}
                               </select>
                             </div>
                           )}
@@ -2702,7 +3137,8 @@ export default function App(){
               <Card>
                 <p style={{fontSize:12,color:"#64748b",marginBottom:6}}>Base de dados · {trans.length} transações · {pend.length} por categorizar</p>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  <Btn onClick={exportJSON} style={{fontSize:12}}>↓ Exportar backup</Btn>
+                  <Btn onClick={exportJSON} style={{fontSize:12}}>↓ Exportar backup JSON</Btn>
+                  <Btn onClick={exportExcel} style={{fontSize:12,background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.2)"}}>↓ Exportar Excel/CSV</Btn>
                   <label style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"1px solid #1e3048",borderRadius:10,padding:"8px 14px",fontSize:12,cursor:"pointer"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
                   <Btn variant="danger" style={{fontSize:12}} onClick={()=>{if(confirm("Apagar todas as transações?")){setTrans([]);setPend([]);}}}>Apagar</Btn>
                 </div>
