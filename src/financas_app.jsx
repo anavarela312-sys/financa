@@ -354,8 +354,8 @@ const EMP_CATS_VARIAVEIS = [
 const EMP_TA_AJUDAS = 0.05; // 5% sobre ajudas de custo (dentro dos limites legais)
 const EMP_TA_REP    = 0.10; // 10% sobre despesas de representação
 
-const fE=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2});
-const fE0=n=>n.toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const fE=n=>(n==null?"-":(+n).toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2}));
+const fE0=n=>(n==null?"-":(+n).toLocaleString("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:0}));
 const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const CAT_COLORS=["#3b82f6","#ef4444","#f97316","#84cc16","#6366f1","#ec4899","#8b5cf6","#eab308","#14b8a6","#f59e0b","#06b6d4","#22c55e","#a855f7","#78716c"];
 
@@ -3014,7 +3014,7 @@ export default function App(){
                             {saiDia>0&&<span style={{fontSize:10,color:"#ef4444"}}>-{fE(saiDia)}</span>}
                           </div>
                         </div>
-                        <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>{fE(saldoDia)}</span>
+                        <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>{saldoDia!=null?fE(saldoDia):"—"}</span>
                       </div>
                       {/* Day transactions */}
                       <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:10,overflow:"hidden"}}>
