@@ -401,6 +401,7 @@ button:active{transform:scale(0.97)}
 .tabbar button.act{color:#3b82f6}
 .catrow{transition:background 0.12s}
 .catrow:hover{background:rgba(59,130,246,0.10) !important}
+.trans-row:hover{background:rgba(255,255,255,0.04) !important}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:flex-end;justify-content:center}
 .modal{background:#0d1a2e;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto}
 @media(min-width:640px){.modal-bg{align-items:center}.modal{border-radius:20px;max-height:80vh}}
@@ -558,6 +559,8 @@ export default function App(){
 
   const handleFile=f=>{if(!f)return;const r=new FileReader();r.onload=e=>processar(e.target.result);r.readAsText(f,"utf-8");};
   const isInt=t=>t.cat==="Transferência Interna"||t.cat==="Poupança";
+  const isCO=t=>t.sub==="Compras Outros";
+  const isComprasOutros=t=>t.sub==="Compras Outros";
 
   // All transactions in month (for budget/summary)
   const transMesTodos=trans.filter(t=>{
@@ -582,8 +585,8 @@ export default function App(){
     }).reverse();
   },[transMes]);
 
-  const desp=transMesTodos.filter(t=>t.tipo==="d"&&!isInt(t));
-  const rec=transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t));
+  const desp=transMesTodos.filter(t=>t.tipo==="d"&&!isInt(t)&&!isComprasOutros(t));
+  const rec=transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t)&&!isComprasOutros(t));
   const totD=desp.reduce((a,t)=>a+t.val,0);
   const totR=rec.reduce((a,t)=>a+t.val,0);
 
@@ -770,7 +773,7 @@ export default function App(){
       const [cat,sub]=catModal.split("::");
       return transMesTodos.filter(t=>t.cat===cat&&(t.sub===sub||(t.splits&&t.splits.some(s=>s.cat===cat&&s.sub===sub))));
     }
-    if(catModal==="Receita") return transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t));
+    if(catModal==="Receita") return transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t)&&!isCO(t));
     return transMesTodos.filter(t=>t.cat===catModal);
   })():[];
   const catModalLabel=catModal?.includes("::")?catModal.split("::")[1]:catModal;
@@ -960,7 +963,7 @@ export default function App(){
                       const diff=prevPat!==null?pat-prevPat:null;
                       const pct=prevPat?((pat-prevPat)/Math.abs(prevPat)*100):null;
                       return(
-                        <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220"}}>
+                        <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220",transition:"background 0.1s"}}>
                           <td style={{padding:"10px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
                           <td style={{padding:"10px",color:"#22c55e"}}>{fE(totalA)}</td>
                           <td style={{padding:"10px",color:"#ef4444"}}>{fE(totalP)}</td>
@@ -2616,14 +2619,17 @@ export default function App(){
               )}
               {(()=>{
                 const saldo=totR-totD;
-                const taxaPoupanca=totR>0?((totR-totD)/totR*100):0;
+                // Taxa de poupança = movimentos Poupança+Investimento / receitas
+                const poupancaInvest=transMesTodos.filter(t=>t.tipo==="d"&&(t.cat==="Poupança"||t.cat==="Investimento")).reduce((a,t)=>a+t.val,0);
+                const taxaPoupanca=totR>0?(poupancaInvest/totR*100):0;
                 const totalOrc=Object.entries(orcMes).filter(([k])=>!k.includes("::")).reduce((a,b)=>a+b[1],0);
                 const pctOrc=totalOrc>0?(totD/totalOrc*100):0;
+                const saldoPct=totR>0?(saldo/totR*100):0;
                 const kpis=[
                   {label:"Receitas",sub:"entradas do mês",val:fE(totR),color:"#22c55e"},
                   {label:"Despesas",sub:"saídas do mês",val:fE(totD),color:"#ef4444"},
-                  {label:"Saldo",sub:"receitas − despesas",val:fE(saldo),color:saldo>=0?"#22c55e":"#ef4444"},
-                  {label:"Taxa de Poupança",sub:"% das receitas poupadas",val:`${taxaPoupanca.toFixed(1)}%`,color:taxaPoupanca>=20?"#22c55e":taxaPoupanca>=10?"#f59e0b":"#ef4444"},
+                  {label:"Saldo",sub:`${saldoPct.toFixed(1)}% das receitas`,val:fE(saldo),color:saldo>=0?"#22c55e":"#ef4444"},
+                  {label:"Taxa de Poupança",sub:`${fE(poupancaInvest)} poupado/investido`,val:`${taxaPoupanca.toFixed(1)}%`,color:taxaPoupanca>=20?"#22c55e":taxaPoupanca>=10?"#f59e0b":"#ef4444"},
                   {label:"Vs Orçamento",sub:totalOrc>0?`${fE(totD)} de ${fE(totalOrc)}`:"sem orçamento definido",val:totalOrc>0?`${pctOrc.toFixed(0)}%`:"—",color:pctOrc>100?"#ef4444":pctOrc>80?"#f59e0b":"#22c55e"},
                 ];
                 return(
@@ -2778,20 +2784,31 @@ export default function App(){
                 })()}
               </div>
 
-              {/* KPIs */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
-                {[
-                  {label:"Orçamentado",val:totalOrçamentado,color:"#3b82f6"},
-                  {label:"Gasto",val:totD,color:totD>totalOrçamentado?"#ef4444":"#e2e8f0"},
-                  {label:"Receitas",val:totR,color:"#22c55e"},
-                  {label:"Disponível",val:Math.max(0,totalOrçamentado-totD),color:totD>totalOrçamentado?"#ef4444":"#22c55e"},
-                ].map(k=>(
-                  <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"10px 12px"}}>
-                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
-                    <p style={{fontSize:15,fontWeight:600,color:k.color}}>{fE(k.val)}</p>
+              {/* KPIs — 5 cards */}
+              {(()=>{
+                const saldoPrevisto=totR-totalOrçamentado;
+                const saldoReal=totR-totD;
+                const pctOrcUsado=totalOrçamentado>0?(totD/totalOrçamentado*100):0;
+                const orcKpis=[
+                  {label:"Receitas",sub:"entradas do mês",val:fE(totR),color:"#22c55e"},
+                  {label:"Despesas reais",sub:"gastos até agora",val:fE(totD),color:"#ef4444"},
+                  {label:"Saldo previsto",sub:"receitas − orçamento",val:fE(saldoPrevisto),color:saldoPrevisto>=0?"#22c55e":"#ef4444",sub2:saldoPrevisto>=0?"✓ dentro do plano":"⚠ acima do plano"},
+                  {label:"Saldo real",sub:"receitas − gastos reais",val:fE(saldoReal),color:saldoReal>=0?"#22c55e":"#ef4444"},
+                  {label:"Orçamento usado",sub:totalOrçamentado>0?`${fE(totD)} de ${fE(totalOrçamentado)}`:"sem orçamento",val:totalOrçamentado>0?`${pctOrcUsado.toFixed(0)}%`:"—",color:pctOrcUsado>100?"#ef4444":pctOrcUsado>80?"#f59e0b":"#22c55e"},
+                ];
+                return(
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)",gap:8,marginBottom:14}}>
+                    {orcKpis.map(k=>(
+                      <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:12,padding:"10px 12px"}}>
+                        <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                        <p style={{fontSize:15,fontWeight:700,color:k.color}}>{k.val}</p>
+                        <p style={{fontSize:9,color:"#64748b",marginTop:3}}>{k.sub}</p>
+                        {k.sub2&&<p style={{fontSize:9,color:k.color,marginTop:1}}>{k.sub2}</p>}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
 
               {/* Receitas detail */}
               {rec.length>0&&(
@@ -3054,22 +3071,20 @@ export default function App(){
                                 </div>
                               </div>
                             ):(
-                              <div style={{padding:"10px 14px"}} className="hrow">
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3,cursor:"pointer"}}
-                                  onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||"",contaOrigem:t.contaOrigem||t.contaId||"",contaDestino:t.contaDestino||""});}}>
+                              <div className="trans-row" style={{padding:"7px 12px",cursor:"pointer"}} onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||"",contaOrigem:t.contaOrigem||t.contaId||"",contaDestino:t.contaDestino||""});}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                                   <div style={{flex:1,minWidth:0,marginRight:8}}>
-                                    <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
-                                    {t.cat&&<div style={{display:"flex",gap:5,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
-                                      <Chip label={`${cats[t.cat]?.icon||""} ${t.cat}`} color={cats[t.cat]?.color||"#64748b"} sm/>
+                                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                      <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:isMobile?"180px":"400px"}}>{t.ent||t.desc}</p>
+                                      {t.cat&&<Chip label={`${cats[t.cat]?.icon||""} ${t.cat}`} color={cats[t.cat]?.color||"#64748b"} sm/>}
                                       {t.sub&&<span style={{fontSize:10,color:"#94a3b8"}}>· {t.sub}</span>}
-                                      {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝 {t.nota}</span>}
-                                    </div>}
-                                    {t.splits?.length>0&&<span style={{fontSize:10,color:"#a855f7"}}>✂ dividido em {t.splits.length} partes</span>}
+                                      {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝</span>}
+                                      {t.splits?.length>0&&<span style={{fontSize:10,color:"#a855f7"}}>✂</span>}
+                                    </div>
                                   </div>
-                                  <div style={{textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:8}}>
-                                    <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}}
-                                      style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"3px 7px",fontSize:10,cursor:"pointer"}}>✂</button>
-                                    <p style={{fontSize:14,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?"#64748b":"#e2e8f0"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
+                                  <div style={{textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
+                                    <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}} style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"2px 6px",fontSize:10,cursor:"pointer"}}>✂</button>
+                                    <p style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?"#64748b":"#e2e8f0",whiteSpace:"nowrap"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
                                   </div>
                                 </div>
                               </div>
