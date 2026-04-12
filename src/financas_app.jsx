@@ -510,6 +510,9 @@ export default function App(){
   const [patSubTab,setPatSubTab]=useState("geral");
   const [invSelected,setInvSelected]=useState("xtb");
   const [newSnap,setNewSnap]=useState("");
+  const [snapConta,setSnapConta]=useState("");
+  const [snapData,setSnapData]=useState(new Date().toISOString().slice(0,10));
+  const [snapVal,setSnapVal]=useState("");
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
 
@@ -957,8 +960,8 @@ export default function App(){
                   ))}
                 </div>
               </div>
-            );
-          })()}
+          );
+        })()}
 
           {/* Historical evolution */}
           {patSnaps.length>1&&(
@@ -3239,11 +3242,7 @@ export default function App(){
           )}
 
           {/* CONTAS */}
-          {tab==="contas"&&(()=>{
-            const [snapConta,setSnapConta]=React.useState(contas[0]?.id||"");
-            const [snapData,setSnapData]=React.useState(new Date().toISOString().slice(0,10));
-            const [snapVal,setSnapVal]=React.useState("");
-            return(
+          {tab==="contas"&&(
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>Gere saldos e contas</p></>}
               <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:12}}>
@@ -3321,8 +3320,7 @@ export default function App(){
               <button onClick={()=>setContas(prev=>[...prev,{id:crypto.randomUUID(),nome:"Nova Conta",tipo:"corrente",secao:"corrente",saldo:0,cor:"#3b82f6",icon:"🏦"}])} style={{width:"100%",padding:"10px",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px dashed rgba(59,130,246,0.3)",borderRadius:12,marginBottom:10,fontSize:13}}>+ Adicionar conta</button>
               <Card><div style={{display:"flex",justifyContent:"space-between"}}><div><p style={{fontSize:11,color:"#64748b",marginBottom:3}}>Património total</p><p style={{fontSize:24,fontWeight:700,color:"#22c55e"}}>{fE(patrimonioTotal)}</p></div></div></Card>
             </div>
-            );
-          })()}
+          )}
 
           {/* CATEGORIAS */}
           {tab==="categorias"&&(
