@@ -369,6 +369,7 @@ const EMP_DIAS_UTEIS_BASE = {
 };
 
 const EMP_OBRIGACOES = [
+  { id:"irc_2025",label:"IRC 2025 (liquidação)",   data:"2026-05-31", valor_est:910.72, tipo:"irc" },
   { id:"iva_q1",  label:"IVA 1º Trim (Jan-Mar)",  data:"2026-05-15", valor_est:null, tipo:"iva" },
   { id:"iva_q2",  label:"IVA 2º Trim (Abr-Jun)",  data:"2026-08-15", valor_est:null, tipo:"iva" },
   { id:"iva_q3",  label:"IVA 3º Trim (Jul-Set)",  data:"2026-11-15", valor_est:null, tipo:"iva" },
@@ -3025,11 +3026,25 @@ export default function App(){
                                   <div><Lbl>Data</Lbl><input type="date" value={editD.data} onChange={e=>setEditD(d=>({...d,data:e.target.value}))}/></div>
                                   <div><Lbl>Entidade</Lbl><input type="text" value={editD.ent} onChange={e=>setEditD(d=>({...d,ent:e.target.value}))}/></div>
                                   <div><Lbl>Categoria</Lbl><select value={editD.cat} onChange={e=>setEditD(d=>({...d,cat:e.target.value,sub:""}))}>
-                                    {Object.keys(cats).map(c=><option key={c} value={c}>{c}</option>)}
+                                    {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
                                   </select></div>
                                   <div><Lbl>Subcategoria</Lbl><select value={editD.sub} onChange={e=>setEditD(d=>({...d,sub:e.target.value}))}>
                                     <option value="">—</option>{(cats[editD.cat]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
                                   </select></div>
+                                  {(editD.cat==="Transferência Interna"||editD.cat==="Poupança")?(<>
+                                    <div><Lbl>Conta origem</Lbl><select value={editD.contaOrigem||""} onChange={e=>setEditD(d=>({...d,contaOrigem:e.target.value}))}>
+                                      <option value="">— selecionar —</option>
+                                      {CONTA_SECOES.map(sec=>{const sc=contas.filter(c=>c.secao===sec.id);if(!sc.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{sc.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
+                                    </select></div>
+                                    <div><Lbl>Conta destino</Lbl><select value={editD.contaDestino||""} onChange={e=>setEditD(d=>({...d,contaDestino:e.target.value}))}>
+                                      <option value="">— selecionar —</option>
+                                      {CONTA_SECOES.map(sec=>{const sc=contas.filter(c=>c.secao===sec.id);if(!sc.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{sc.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
+                                    </select></div>
+                                  </>):(<div style={{gridColumn:"1/-1"}}><Lbl>Conta</Lbl>
+                                    <select value={editD.contaOrigem||""} onChange={e=>setEditD(d=>({...d,contaOrigem:e.target.value}))}>
+                                      <option value="">— não alterar —</option>
+                                      {CONTA_SECOES.map(sec=>{const sc=contas.filter(c=>c.secao===sec.id);if(!sc.length)return null;return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{sc.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);})}
+                                    </select></div>)}
                                 </div>
                                 <div style={{marginBottom:8}}><Lbl>Nota</Lbl><input type="text" value={editD.nota||""} placeholder="Nota opcional..." onChange={e=>setEditD(d=>({...d,nota:e.target.value}))}/></div>
                                 <div style={{display:"flex",gap:8}}>
@@ -3041,7 +3056,7 @@ export default function App(){
                             ):(
                               <div style={{padding:"10px 14px"}} className="hrow">
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3,cursor:"pointer"}}
-                                  onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||""});}}>
+                                  onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||"",contaOrigem:t.contaOrigem||t.contaId||"",contaDestino:t.contaDestino||""});}}>
                                   <div style={{flex:1,minWidth:0,marginRight:8}}>
                                     <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
                                     {t.cat&&<div style={{display:"flex",gap:5,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
