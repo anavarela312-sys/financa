@@ -103,14 +103,14 @@ const DEFAULT_CATS = {
 const NET_CATS = new Set(["Saúde","Vários / Extras","Lexie"]);
 
 const REGRAS = [
-  { m:["TRF P/ Apparte - Mealheiro"], cat:"Transferência Interna", sub:"Apparte / Mealheiro", ent:"Apparte" },
+  { m:["TRF P/ Apparte - Mealheiro"], cat:"Transferência Interna", sub:"Poupança", ent:"Apparte" },
   { m:["TRF P/ Apparte - Saude"], cat:"Transferência Interna", sub:"Caixinha Saúde", ent:"Apparte" },
   { m:["TRF P/ Apparte - Casa"], cat:"Transferência Interna", sub:"Caixinha Casa", ent:"Apparte" },
   { m:["TRF P/ Apparte - Lexie"], cat:"Transferência Interna", sub:"Caixinha Lexie", ent:"Apparte" },
   { m:["TRF P/ Apparte - Prendas"], cat:"Transferência Interna", sub:"Caixinha Prendas", ent:"Apparte" },
   { m:["TRF P/ Apparte - Veterinario"], cat:"Transferência Interna", sub:"Caixinha Veterinário", ent:"Apparte" },
   { m:["TRF DE Apparte"], cat:"Transferência Interna", sub:"Apparte / Mealheiro", ent:"Apparte" },
-  { m:["DD Optimize","OPTIMIZE INVES"], cat:"Transferência Interna", sub:"Apparte / Mealheiro", ent:"Optimize" },
+  { m:["DD Optimize","OPTIMIZE INVES"], cat:"Transferência Interna", sub:"Poupança", ent:"Optimize" },
   { m:["VIS PAGAMENTO CARTAO CREDITO"], cat:"Transferência Interna", sub:"Cartão Crédito", ent:"Millennium" },
   { m:["LEV ATM"], cat:"Transferência Interna", sub:"Entre Contas", ent:"Millennium" },
   { m:["WISE EUROPE","TRF P/ Wise"], cat:"Transferência Interna", sub:"Entre Contas", ent:"Wise" },
@@ -663,7 +663,27 @@ export default function App(){
     ));
   }, []);
 
-  const patrimonioTotal=contas.reduce((a,c)=>a+c.saldo,0);
+  // Compute real saldo per conta = saldoRef + movements after saldoRefData
+  const contaSaldos=useMemo(()=>{
+    const result={};
+    contas.forEach(c=>{
+      if(c.saldoRef!=null&&c.saldoRefData){
+        const refDate=c.saldoRefData;
+        const movs=trans.filter(t=>{
+          const tContaId=t.contaId||t.contaOrigem||"mill";
+          const matches=tContaId===c.id;
+          const after=t.data>refDate;
+          return matches&&after;
+        });
+        const delta=movs.reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0);
+        result[c.id]=c.saldoRef+delta;
+      } else {
+        result[c.id]=c.saldo||0;
+      }
+    });
+    return result;
+  },[contas,trans]);
+  const patrimonioTotal=contas.reduce((a,c)=>a+(contaSaldos[c.id]||0),0);
 
   // Filtered transactions for list
   const globalResults=useMemo(()=>{
@@ -2620,7 +2640,7 @@ export default function App(){
               {(()=>{
                 const saldo=totR-totD;
                 // Taxa de poupança = movimentos Poupança+Investimento / receitas
-                const poupancaInvest=transMesTodos.filter(t=>t.tipo==="d"&&(t.cat==="Poupança"||t.cat==="Investimento")).reduce((a,t)=>a+t.val,0);
+                const poupancaInvest=transMesTodos.filter(t=>t.tipo==="d"&&(t.cat==="Poupança"||t.cat==="Investimento"||(t.cat==="Transferência Interna"&&t.sub==="Poupança"))).reduce((a,t)=>a+t.val,0);
                 const taxaPoupanca=totR>0?(poupancaInvest/totR*100):0;
                 const totalOrc=Object.entries(orcMes).filter(([k])=>!k.includes("::")).reduce((a,b)=>a+b[1],0);
                 const pctOrc=totalOrc>0?(totD/totalOrc*100):0;
@@ -2652,7 +2672,7 @@ export default function App(){
                   {CONTA_SECOES.map(sec=>{
                     const secContas=contas.filter(c=>c.secao===sec.id);
                     if(!secContas.length) return null;
-                    const secTotal=secContas.reduce((a,c)=>a+c.saldo,0);
+                    const secTotal=secContas.reduce((a,c)=>a+(contaSaldos[c.id]||0),0);
                     return(
                       <div key={sec.id}>
                         {/* Section label */}
@@ -2671,7 +2691,7 @@ export default function App(){
                                 <span style={{fontSize:13}}>{c.icon}</span>
                                 <span style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:72}}>{c.nome}</span>
                               </div>
-                              <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(c.saldo)}</p>
+                              <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(contaSaldos[c.id]??0)}</p>
                             </div>
                           ))}
                         </div>
@@ -3199,7 +3219,7 @@ export default function App(){
                             <div style={{gridColumn:"1/-1"}}><Lbl>{t.tipo==="d"?"Conta (débito de)":"Conta (crédito em)"}</Lbl>
                               <select value={ed.contaOrigem||""} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],contaOrigem:e.target.value}}))}>
                                 <option value="">— não actualizar saldo —</option>
-                                {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE(c.saldo)})</option>)}
+                                {contas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome} ({fE(contaSaldos[c.id]??0)})</option>)}
                               </select>
                             </div>
                           )}
@@ -3219,51 +3239,90 @@ export default function App(){
           )}
 
           {/* CONTAS */}
-          {tab==="contas"&&(
+          {tab==="contas"&&(()=>{
+            const [snapConta,setSnapConta]=React.useState(contas[0]?.id||"");
+            const [snapData,setSnapData]=React.useState(new Date().toISOString().slice(0,10));
+            const [snapVal,setSnapVal]=React.useState("");
+            return(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:10}}>Atualiza os saldos</p></>}
-              <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:10}}>
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>Gere saldos e contas</p></>}
+              <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:12}}>
                 ＋ Adicionar movimento manual
               </button>
-              <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:14}}>
-                <p style={{fontSize:11,color:"#f59e0b",marginBottom:6}}>💡 Saldo inicial para cálculo correcto</p>
-                <p style={{fontSize:11,color:"#64748b",marginBottom:8}}>Define o saldo da conta no início do período importado para o saldo nos movimentos bater certo com o extrato.</p>
-                {contas.filter(c=>c.secao==="corrente").map(c=>(
-                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                    <span style={{fontSize:13}}>{c.icon}</span>
-                    <span style={{fontSize:12,color:"#e2e8f0",flex:1}}>{c.nome}</span>
-                    <input type="number" step="0.01"
-                      value={c.saldoInicial??""} placeholder="Saldo inicial..."
-                      onChange={e=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldoInicial:parseFloat(e.target.value)||0}:x))}
-                      style={{width:110,fontSize:12,textAlign:"right",padding:"4px 8px"}}/>
+
+              {/* Saldo por data — single card */}
+              <Card style={{marginBottom:14}}>
+                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📍 Registar saldo</p>
+                <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Define o saldo de uma conta numa data específica. Os movimentos após essa data actualizam o saldo automaticamente.</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,alignItems:"end"}}>
+                  <div>
+                    <Lbl>Conta</Lbl>
+                    <select value={snapConta} onChange={e=>setSnapConta(e.target.value)}>
+                      {CONTA_SECOES.map(sec=>{
+                        const sc=contas.filter(c=>c.secao===sec.id);
+                        if(!sc.length) return null;
+                        return(<optgroup key={sec.id} label={`${sec.icon} ${sec.label}`}>{sc.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nome}</option>)}</optgroup>);
+                      })}
+                    </select>
                   </div>
-                ))}
-              </div>
+                  <div>
+                    <Lbl>Data</Lbl>
+                    <input type="date" value={snapData} onChange={e=>setSnapData(e.target.value)}/>
+                  </div>
+                  <div>
+                    <Lbl>Saldo (€)</Lbl>
+                    <input type="number" step="0.01" placeholder="Ex: 163.64" value={snapVal} onChange={e=>setSnapVal(e.target.value)}/>
+                  </div>
+                  <Btn variant="primary" style={{padding:"10px 16px",whiteSpace:"nowrap"}} onClick={()=>{
+                    const v=parseFloat(snapVal);
+                    if(isNaN(v)||!snapConta||!snapData) return;
+                    setContas(prev=>prev.map(c=>c.id===snapConta?{...c,saldoRef:v,saldoRefData:snapData}:c));
+                    setSnapVal("");
+                  }}>Guardar</Btn>
+                </div>
+                {/* Show current snapshots */}
+                {contas.filter(c=>c.saldoRef!=null).length>0&&(
+                  <div style={{marginTop:12,borderTop:"1px solid #1e3048",paddingTop:10}}>
+                    <p style={{fontSize:10,color:"#64748b",marginBottom:6}}>SALDOS DE REFERÊNCIA</p>
+                    {contas.filter(c=>c.saldoRef!=null).map(c=>(
+                      <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0"}}>
+                        <span style={{fontSize:12,color:"#e2e8f0"}}>{c.icon} {c.nome}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:11,color:"#64748b"}}>{c.saldoRefData}</span>
+                          <span style={{fontSize:12,fontWeight:600,color:"#22c55e"}}>{fE(c.saldoRef)}</span>
+                          <span style={{fontSize:12,fontWeight:700,color:"#3b82f6"}}>→ {fE(contaSaldos[c.id]??0)}</span>
+                          <button onClick={()=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldoRef:null,saldoRefData:null}:x))} style={{background:"none",border:"none",color:"#64748b",fontSize:12,cursor:"pointer"}}>×</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              {/* Contas list */}
               {contas.map(c=>(
-                <div key={c.id} style={{background:"#0d1a2e",border:`1px solid ${c.cor}44`,borderRadius:14,padding:16,marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div key={c.id} style={{background:"#0d1a2e",border:`1px solid ${c.cor||"#1e3048"}44`,borderRadius:14,padding:14,marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>
-                      <div style={{width:36,height:36,borderRadius:10,background:c.cor+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{c.icon}</div>
+                      <div style={{width:32,height:32,borderRadius:8,background:(c.cor||"#3b82f6")+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{c.icon}</div>
                       <div style={{flex:1,minWidth:0}}>
-                        <input type="text" value={c.nome} onChange={e=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,nome:e.target.value}:x))} style={{background:"none",border:"none",borderBottom:"1px solid #1e3048",borderRadius:0,padding:"2px 0",fontSize:13,fontWeight:600,color:"#fff",marginBottom:2}}/>
-                        <p style={{fontSize:10,color:c.cor,textTransform:"uppercase"}}>{c.tipo}</p>
+                        <input type="text" value={c.nome} onChange={e=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,nome:e.target.value}:x))} style={{background:"none",border:"none",borderBottom:"1px solid #1e3048",borderRadius:0,padding:"2px 0",fontSize:13,fontWeight:600,color:"#fff",width:"100%"}}/>
+                        <p style={{fontSize:10,color:c.cor||"#64748b",textTransform:"uppercase",marginTop:1}}>{c.tipo}</p>
                       </div>
                     </div>
-                    <p style={{fontSize:20,fontWeight:700,color:"#fff",flexShrink:0,marginLeft:10}}>{fE(c.saldo)}</p>
-                  </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <input type="number" placeholder="Novo saldo..." style={{flex:1,fontSize:14}}
-                      onChange={e=>e.target._val=e.target.value}
-                      onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldo:v}:x));e.target.value="";}}}
-                      onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(e.target.value);if(!isNaN(v)){setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldo:v}:x));e.target.value="";e.target.blur();}}}}/>
-                    <button onClick={()=>setContas(prev=>prev.filter(x=>x.id!==c.id))} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"10px 14px",borderRadius:10}}>×</button>
+                    <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
+                      <p style={{fontSize:18,fontWeight:700,color:"#fff"}}>{fE(contaSaldos[c.id]??0)}</p>
+                      {c.saldoRef!=null&&<p style={{fontSize:9,color:"#64748b"}}>ref {c.saldoRefData}</p>}
+                    </div>
+                    <button onClick={()=>setContas(prev=>prev.filter(x=>x.id!==c.id))} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"8px 12px",borderRadius:8,marginLeft:8}}>×</button>
                   </div>
                 </div>
               ))}
-              <button onClick={()=>setContas(prev=>[...prev,{id:crypto.randomUUID(),nome:"Nova Conta",tipo:"corrente",saldo:0,cor:"#3b82f6",icon:"🏦"}])} style={{width:"100%",padding:"12px",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px dashed rgba(59,130,246,0.3)",borderRadius:14,marginBottom:10,fontSize:14}}>+ Adicionar conta</button>
+              <button onClick={()=>setContas(prev=>[...prev,{id:crypto.randomUUID(),nome:"Nova Conta",tipo:"corrente",secao:"corrente",saldo:0,cor:"#3b82f6",icon:"🏦"}])} style={{width:"100%",padding:"10px",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px dashed rgba(59,130,246,0.3)",borderRadius:12,marginBottom:10,fontSize:13}}>+ Adicionar conta</button>
               <Card><div style={{display:"flex",justifyContent:"space-between"}}><div><p style={{fontSize:11,color:"#64748b",marginBottom:3}}>Património total</p><p style={{fontSize:24,fontWeight:700,color:"#22c55e"}}>{fE(patrimonioTotal)}</p></div></div></Card>
             </div>
-          )}
+            );
+          })()}
 
           {/* CATEGORIAS */}
           {tab==="categorias"&&(
