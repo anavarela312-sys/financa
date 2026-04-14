@@ -97,7 +97,7 @@ const DEFAULT_CATS = {
   "Despesas bancárias":{ icon:"🏦", color:"#64748b", subs:["Comissões","Imposto Selo"] },
   "Prendas":           { icon:"🎁", color:"#a855f7", subs:["Família","Amigos Lexie"] },
   "Vários / Extras":   { icon:"📦", color:"#78716c", subs:["Sem subcategoria","Compras Outros","Roupa","Gadgets IT","Serviços PSC"] },
-  "Transferência Interna":{ icon:"↔️", color:"#94a3b8", subs:["Apparte / Mealheiro","Caixinha Saúde","Caixinha Casa","Caixinha Lexie","Caixinha Prendas","Caixinha Veterinário","Cartão Crédito","Entre Contas","Empresa","Outro"] },
+  "Transferência Interna":{ icon:"↔️", color:"#94a3b8", subs:["Poupança","Apparte / Mealheiro","Caixinha Saúde","Caixinha Casa","Caixinha Lexie","Caixinha Prendas","Caixinha Veterinário","Cartão Crédito","Entre Contas","Empresa","Outro"] },
   "Receita":           { icon:"💵", color:"#22c55e", subs:["Vencimento","Reembolso Saúde","Pagamento Cliente","Devolução","Cheque Digital","Outro"] },
 };
 const NET_CATS = new Set(["Saúde","Vários / Extras","Lexie"]);
@@ -129,12 +129,12 @@ const REGRAS = [
   { m:["BALOICO","PORTELA CAFES","CAFE YAKARI","PASTELARIA","SANTINI"], cat:"Alimentação", sub:"Cafetaria", ent:"" },
   { m:["CASA DO CROQUETE"], cat:"Alimentação", sub:"Restauração", ent:"Casa do Croquete" },
   { m:["CHURRASQUEIRA","CHURRARIA","MCDONALDS","PRONTO A COMER","ROUNDFOOD"], cat:"Alimentação", sub:"Restauração", ent:"" },
-  { m:["CONTINENTE"], cat:"Alimentação", sub:"Supermercado", ent:"Continente" },
-  { m:["MERCADONA"], cat:"Alimentação", sub:"Supermercado", ent:"Mercadona" },
-  { m:["PINGO DOCE"], cat:"Alimentação", sub:"Supermercado", ent:"Pingo Doce" },
-  { m:["INTERMARCHE"], cat:"Alimentação", sub:"Supermercado", ent:"Intermarché" },
-  { m:["E.LECLERC"], cat:"Alimentação", sub:"Supermercado", ent:"E.Leclerc" },
-  { m:["PINHALSODI","NOTE PINHAL","SUPER SABBER"], cat:"Alimentação", sub:"Supermercado", ent:"" },
+  { m:["CONTINENTE"], cat:"Casa", sub:"Supermercado", ent:"Continente" },
+  { m:["MERCADONA"], cat:"Casa", sub:"Supermercado", ent:"Mercadona" },
+  { m:["PINGO DOCE"], cat:"Casa", sub:"Supermercado", ent:"Pingo Doce" },
+  { m:["INTERMARCHE"], cat:"Casa", sub:"Supermercado", ent:"Intermarché" },
+  { m:["E.LECLERC"], cat:"Casa", sub:"Supermercado", ent:"E.Leclerc" },
+  { m:["PINHALSODI","NOTE PINHAL","SUPER SABBER"], cat:"Casa", sub:"Supermercado", ent:"" },
   { m:["PAG.PRESTACAO N. 041"], cat:"Casa", sub:"Renda", ent:"Senhorio" },
   { m:["DD METLIFE","METLIFE EUROPE"], cat:"Casa", sub:"Seguro Vida", ent:"Metlife" },
   { m:["DD OCIDENTAL","OCIDENTAL"], cat:"Casa", sub:"Seguro Casa", ent:"Ocidental" },
@@ -526,6 +526,13 @@ export default function App(){
   const [searchVal,setSearchVal]=useState("");
   const [splitModal,setSplitModal]=useState(null); // transaction id to split
   const [splitParts,setSplitParts]=useState([]); // [{id, val, cat, sub, nota}]
+  const [highlightTransId,setHighlightTransId]=useState(null); // id to scroll/highlight in transações
+  const highlightRef=useRef(null);
+  useEffect(()=>{
+    if(!highlightTransId) return;
+    const timer=setTimeout(()=>setHighlightTransId(null),3000);
+    return()=>clearTimeout(timer);
+  },[highlightTransId]);
   const [dateFrom,setDateFrom]=useState("");
   const [dateTo,setDateTo]=useState("");
   const [catModal,setCatModal]=useState(null); // cat name to show transactions
@@ -3000,7 +3007,7 @@ export default function App(){
                     <button onClick={()=>{
                       const val=parseFloat(manualT.val);
                       if(!val||!manualT.desc){alert("Preenche pelo menos a descrição e o valor.");return;}
-                      const t={id:crypto.randomUUID(),data:manualT.data,dataOrig:manualT.data,desc:manualT.desc,val:Math.abs(val),tipo:manualT.tipo,cat:manualT.cat,sub:manualT.sub,ent:manualT.ent||manualT.desc,nota:manualT.nota,ok:true,contaOrigem:manualT.contaOrigem,contaDestino:manualT.contaDestino,contaId:manualT.contaOrigem||contaFiltro};
+                      const t={id:crypto.randomUUID(),data:manualT.data,dataOrig:manualT.data,desc:manualT.desc,val:Math.abs(val),tipo:manualT.tipo,cat:manualT.cat,sub:manualT.sub,ent:manualT.ent||manualT.desc,nota:manualT.nota,ok:true,contaOrigem:manualT.contaOrigem,contaDestino:manualT.contaDestino,contaId:manualT.contaOrigem||(contaFiltro!=="all"?contaFiltro:"mill")};
                       setTrans(prev=>[...prev,t]);
                       applyBalance(manualT.cat,Math.abs(val),manualT.tipo,manualT.contaOrigem,manualT.contaDestino);
                       setManualT({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
@@ -3059,7 +3066,8 @@ export default function App(){
                       {/* Day transactions */}
                       <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:10,overflow:"hidden"}}>
                         {dayTrans.map((t,i)=>(
-                          <div key={t.id} style={{borderBottom:i<dayTrans.length-1?"1px solid #0a1220":"none"}}>
+                          <div key={t.id} ref={highlightTransId===t.id?el=>{if(el){el.scrollIntoView({behavior:"smooth",block:"center"});}}:null}
+                            style={{borderBottom:i<dayTrans.length-1?"1px solid #0a1220":"none",transition:"background 0.5s",background:highlightTransId===t.id?"rgba(59,130,246,0.18)":"transparent"}}>
                             {editId===t.id?(
                               <div style={{padding:14}}>
                                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
@@ -3298,26 +3306,6 @@ export default function App(){
                 )}
               </Card>
 
-              {/* Contas list */}
-              {contas.map(c=>(
-                <div key={c.id} style={{background:"#0d1a2e",border:`1px solid ${c.cor||"#1e3048"}44`,borderRadius:14,padding:14,marginBottom:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>
-                      <div style={{width:32,height:32,borderRadius:8,background:(c.cor||"#3b82f6")+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{c.icon}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <input type="text" value={c.nome} onChange={e=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,nome:e.target.value}:x))} style={{background:"none",border:"none",borderBottom:"1px solid #1e3048",borderRadius:0,padding:"2px 0",fontSize:13,fontWeight:600,color:"#fff",width:"100%"}}/>
-                        <p style={{fontSize:10,color:c.cor||"#64748b",textTransform:"uppercase",marginTop:1}}>{c.tipo}</p>
-                      </div>
-                    </div>
-                    <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                      <p style={{fontSize:18,fontWeight:700,color:"#fff"}}>{fE(contaSaldos[c.id]??0)}</p>
-                      {c.saldoRef!=null&&<p style={{fontSize:9,color:"#64748b"}}>ref {c.saldoRefData}</p>}
-                    </div>
-                    <button onClick={()=>setContas(prev=>prev.filter(x=>x.id!==c.id))} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"8px 12px",borderRadius:8,marginLeft:8}}>×</button>
-                  </div>
-                </div>
-              ))}
-              <button onClick={()=>setContas(prev=>[...prev,{id:crypto.randomUUID(),nome:"Nova Conta",tipo:"corrente",secao:"corrente",saldo:0,cor:"#3b82f6",icon:"🏦"}])} style={{width:"100%",padding:"10px",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px dashed rgba(59,130,246,0.3)",borderRadius:12,marginBottom:10,fontSize:13}}>+ Adicionar conta</button>
               <Card><div style={{display:"flex",justifyContent:"space-between"}}><div><p style={{fontSize:11,color:"#64748b",marginBottom:3}}>Património total</p><p style={{fontSize:24,fontWeight:700,color:"#22c55e"}}>{fE(patrimonioTotal)}</p></div></div></Card>
             </div>
           )}
@@ -3393,10 +3381,18 @@ export default function App(){
           <p style={{fontSize:12,color:"#64748b",marginBottom:14}}>{catTransactions.length} movimentos · {MESES[fMes]} {fAno}</p>
           {catTransactions.length===0&&<p style={{color:"#64748b",fontSize:13}}>Sem movimentos nesta categoria.</p>}
           {catTransactions.map(t=>(
-            <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"9px 0",borderBottom:"1px solid #1e3048"}}>
+            <div key={t.id} className="hrow" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"9px 0",borderBottom:"1px solid #1e3048",cursor:"pointer"}} title="Clica para ver no tab Transações"
+              onClick={()=>{
+                const[y,m]=t.data.split("-");
+                setFAno(parseInt(y));setFMes(parseInt(m)-1);
+                setContaFiltro("all");
+                setTab("transacoes");
+                setHighlightTransId(t.id);
+                setCatModal(null);
+              }}>
               <div style={{flex:1,minWidth:0,marginRight:8}}>
                 <p style={{fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
-                <p style={{fontSize:10,color:"#64748b"}}>{t.data.slice(5).split("-").reverse().join("/")} {t.sub&&`· ${t.sub}`}</p>
+                <p style={{fontSize:10,color:"#64748b"}}>{t.data.slice(5).split("-").reverse().join("/")} {t.sub&&`· ${t.sub}`} <span style={{color:"#3b82f6",fontSize:9}}>→ ver</span></p>
                 {t.nota&&<p style={{fontSize:10,color:"#f59e0b"}}>📝 {t.nota}</p>}
               </div>
               <span style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":"#e2e8f0",flexShrink:0}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
