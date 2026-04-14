@@ -508,9 +508,9 @@ function PieChart({data,size=160}){
   return(
     <svg width={size} height={size} style={{flexShrink:0}}>
       {slices.map((s,i)=>(
-        <path key={i} d={describeArc(cx,cy,r,s.startAngle,s.startAngle+s.angle)} fill={s.color} stroke=th.bg strokeWidth={2}/>
+        <path key={i} d={describeArc(cx,cy,r,s.startAngle,s.startAngle+s.angle)} fill={s.color} stroke={th.bg} strokeWidth={2}/>
       ))}
-      <circle cx={cx} cy={cy} r={r*0.55} fill=th.bgCard/>
+      <circle cx={cx} cy={cy} r={r*0.55} fill={th.bgCard}/>
     </svg>
   );
 }
@@ -2086,15 +2086,15 @@ export default function App(){
                         {/* Grid horizontal + Y labels */}
                         {yTicks2.map(v=>(
                           <g key={v}>
-                            <line x1={pad.l} y1={toY2(v)} x2={W-pad.r} y2={toY2(v)} stroke=th.border strokeWidth="1" strokeDasharray="3,3"/>
-                            <text x={pad.l-5} y={toY2(v)+4} textAnchor="end" fill=th.textMid fontSize="10" fontWeight="500">{fmtY2(v)}</text>
+                            <line x1={pad.l} y1={toY2(v)} x2={W-pad.r} y2={toY2(v)} stroke={th.border} strokeWidth="1" strokeDasharray="3,3"/>
+                            <text x={pad.l-5} y={toY2(v)+4} textAnchor="end" fill={th.textMid} fontSize="10" fontWeight="500">{fmtY2(v)}</text>
                           </g>
                         ))}
                         {/* Grid vertical + X labels */}
                         {xTicks.map(yr=>(
                           <g key={yr}>
-                            <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke=th.border strokeWidth="1" strokeDasharray="2,4"/>
-                            <text x={toX(yr)} y={H-pad.b+13} textAnchor="middle" fill=th.textMid fontSize="10">{yr}a</text>
+                            <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke={th.border} strokeWidth="1" strokeDasharray="2,4"/>
+                            <text x={toX(yr)} y={H-pad.b+13} textAnchor="middle" fill={th.textMid} fontSize="10">{yr}a</text>
                           </g>
                         ))}
                         {/* LF e FIRE lines */}
@@ -2110,14 +2110,14 @@ export default function App(){
                               <polyline
                                 points={s.pts.map(p=>`${toX(p.yr)},${toY2(p.val)}`).join(" ")}
                                 fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round"/>
-                              <circle cx={toX(lastPt.yr)} cy={toY2(lastPt.val)} r="4" fill={s.color} stroke=th.bg strokeWidth="2"/>
+                              <circle cx={toX(lastPt.yr)} cy={toY2(lastPt.val)} r="4" fill={s.color} stroke={th.bg} strokeWidth="2"/>
                               <text x={toX(lastPt.yr)-5} y={toY2(lastPt.val)-10} textAnchor="end" fill={s.color} fontSize="10" fontWeight="700">{fmtY2(lastPt.val)}</text>
                             </g>
                           );
                         })}
                         {/* Eixos */}
-                        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke=th.border strokeWidth="1"/>
-                        <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke=th.border strokeWidth="1"/>
+                        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke={th.border} strokeWidth="1"/>
+                        <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke={th.border} strokeWidth="1"/>
                       </svg>
                     );
                   })()}
@@ -2286,13 +2286,13 @@ export default function App(){
                           {/* Y grid + labels */}
                           {yTicks2.map((v,i)=>(
                             <g key={i}>
-                              <line x1={PL} y1={toY2(v)} x2={W2-PR} y2={toY2(v)} stroke=th.border strokeWidth="1" strokeDasharray="3,3"/>
-                              <text x={PL-4} y={toY2(v)+4} textAnchor="end" fill=th.textLow fontSize="9">{fmtV(v)}</text>
+                              <line x1={PL} y1={toY2(v)} x2={W2-PR} y2={toY2(v)} stroke={th.border} strokeWidth="1" strokeDasharray="3,3"/>
+                              <text x={PL-4} y={toY2(v)+4} textAnchor="end" fill={th.textLow} fontSize="9">{fmtV(v)}</text>
                             </g>
                           ))}
                           {/* Eixos */}
-                          <line x1={PL} y1={PT} x2={PL} y2={H2-PB} stroke=th.border strokeWidth="1"/>
-                          <line x1={PL} y1={H2-PB} x2={W2-PR} y2={H2-PB} stroke=th.border strokeWidth="1"/>
+                          <line x1={PL} y1={PT} x2={PL} y2={H2-PB} stroke={th.border} strokeWidth="1"/>
+                          <line x1={PL} y1={H2-PB} x2={W2-PR} y2={H2-PB} stroke={th.border} strokeWidth="1"/>
                           {/* Lines */}
                           {segs2.map((seg,si)=>(
                             <polyline key={si} points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
@@ -2303,9 +2303,9 @@ export default function App(){
                             if(p.y===null) return null;
                             return(
                               <g key={i}>
-                                <circle cx={p.x} cy={p.y} r="5" fill="#a855f7" stroke=th.bgCard strokeWidth="2"/>
+                                <circle cx={p.x} cy={p.y} r="5" fill="#a855f7" stroke={th.bgCard} strokeWidth="2"/>
                                 <text x={p.x} y={p.y-10} textAnchor="middle" fill="#a855f7" fontSize="9" fontWeight="600">{fmtV(p.val)}</text>
-                                <text x={p.x} y={H2-PB+14} textAnchor="middle" fill=th.textLow fontSize="9">{p.mes}</text>
+                                <text x={p.x} y={H2-PB+14} textAnchor="middle" fill={th.textLow} fontSize="9">{p.mes}</text>
                               </g>
                             );
                           })}
@@ -2451,20 +2451,20 @@ export default function App(){
                           {/* Y grid + labels */}
                           {yTicksI.map((v,i)=>(
                             <g key={i}>
-                              <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke=th.border strokeWidth="1" strokeDasharray="3,3"/>
-                              <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill=th.textLow fontSize="9">{fmtI(v)}</text>
+                              <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke={th.border} strokeWidth="1" strokeDasharray="3,3"/>
+                              <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill={th.textLow} fontSize="9">{fmtI(v)}</text>
                             </g>
                           ))}
                           {/* X labels */}
                           {xTicksI.map(yr=>(
                             <g key={yr}>
-                              <line x1={toIX(yr,projYears+1)} y1={IPT} x2={toIX(yr,projYears+1)} y2={IH-IPB} stroke=th.border strokeWidth="1" strokeDasharray="2,4" opacity="0.5"/>
-                              <text x={toIX(yr,projYears+1)} y={IH-IPB+14} textAnchor="middle" fill=th.textLow fontSize="9">{yr}a</text>
+                              <line x1={toIX(yr,projYears+1)} y1={IPT} x2={toIX(yr,projYears+1)} y2={IH-IPB} stroke={th.border} strokeWidth="1" strokeDasharray="2,4" opacity="0.5"/>
+                              <text x={toIX(yr,projYears+1)} y={IH-IPB+14} textAnchor="middle" fill={th.textLow} fontSize="9">{yr}a</text>
                             </g>
                           ))}
                           {/* Eixos */}
-                          <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke=th.border strokeWidth="1"/>
-                          <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke=th.border strokeWidth="1"/>
+                          <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
+                          <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
                           {/* Proj lines */}
                           {[{pts:p5,color:th.textLow},{pts:p8,color:"#06b6d4"},{pts:p10,color:"#f59e0b"}].map(({pts,color})=>(
                             <polyline key={color}
@@ -2488,7 +2488,7 @@ export default function App(){
                               <polyline points={pts.map(p=>`${p.x},${p.y}`).join(" ")}
                                 fill="none" stroke="#a855f7" strokeWidth="2.5"/>
                               {pts.map((p,i)=>(
-                                <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" stroke=th.bgCard strokeWidth="2"/>
+                                <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" stroke={th.bgCard} strokeWidth="2"/>
                               ))}
                             </>);
                           })()}
