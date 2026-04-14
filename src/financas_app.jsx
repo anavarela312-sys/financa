@@ -483,12 +483,31 @@ export default function App(){
     reservaIVA:0,
   });
   const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats,patSnaps,empData}),[trans,pend,contas,orcs,snaps,cats,patSnaps,empData]);
+  // Helper: migrate orcs keys Alimentação::Supermercado → Casa::Supermercado
+  const migrateOrcs = (orcsObj) => {
+    if (!orcsObj) return orcsObj;
+    let changed = false;
+    const next = {};
+    Object.entries(orcsObj).forEach(([mk, mo]) => {
+      if (mo["Alimentação::Supermercado"] != null) {
+        changed = true;
+        const { ["Alimentação::Supermercado"]: val, ...rest } = mo;
+        next[mk] = { ...rest, "Casa::Supermercado": (rest["Casa::Supermercado"] || 0) + val };
+      } else {
+        next[mk] = mo;
+      }
+    });
+    return changed ? next : orcsObj;
+  };
+
   const handleDriveLoad=useCallback(json=>{
     if(!json) return;
-    if(json.trans?.length>0) forceTrans(json.trans);
+    if(json.trans?.length>0) forceTrans(json.trans.map(t=>
+      t.cat==="Alimentação"&&t.sub==="Supermercado" ? {...t,cat:"Casa"} : t
+    ));
     if(json.pend?.length>0) forcePend(json.pend);
     if(json.contas?.length>0) forceContas(migrateContas(json.contas));
-    if(json.orcs && Object.keys(json.orcs).length>0) forceOrcs(json.orcs);
+    if(json.orcs && Object.keys(json.orcs).length>0) forceOrcs(migrateOrcs(json.orcs));
     if(json.snaps?.length>0) forceSnaps(json.snaps);
     if(json.cats && Object.keys(json.cats).length>0) forceCats(json.cats);
     if(json.patSnaps?.length>0) setPatSnaps(json.patSnaps);
@@ -3128,6 +3147,7 @@ export default function App(){
                                       {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝</span>}
                                       {t.splits?.length>0&&<span style={{fontSize:10,color:"#a855f7"}}>✂</span>}
                                     </div>
+                                    {t.ent&&t.ent!==t.desc&&<p style={{fontSize:10,color:"#475569",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{t.desc}</p>}
                                   </div>
                                   <div style={{textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
                                     <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}} style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"2px 6px",fontSize:10,cursor:"pointer"}}>✂</button>
@@ -3190,16 +3210,43 @@ export default function App(){
                         <div style={{minWidth:0}}>
                           <p style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.ok?"#e2e8f0":"#94a3b8"}}>{entA||t.desc}</p>
                           <p style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
+                          {!t.ok&&<input type="text" defaultValue={entA} placeholder="Entidade..." onClick={e=>e.stopPropagation()}
+                            onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],ent:e.target.value}}))}
+                            style={{fontSize:11,padding:"2px 6px",marginTop:3,width:"100%",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:6,color:"#94a3b8"}}/>}
                         </div>
                         <div onClick={e=>e.stopPropagation()}>
-                          <select value={catA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],cat:e.target.value,sub:""}}))}
+                          <select value={catA} onChange={e=>{
+                            const newCat=e.target.value;
+                            setPEd(p=>({...p,[t.id]:{...p[t.id],cat:newCat,sub:""}}));
+                          }}
                             style={{fontSize:12,padding:"5px 8px",width:"100%",background:!catA?"rgba(239,68,68,0.1)":"#0f1d2e",borderColor:!catA?"rgba(239,68,68,0.4)":"#1e3048"}}>
                             <option value="">-- categorizar --</option>
                             {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
                           </select>
                         </div>
                         <div onClick={e=>e.stopPropagation()}>
-                          <select value={subA} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],sub:e.target.value}}))}
+                          <select value={subA} onChange={e=>{
+                            const newSub=e.target.value;
+                            setPEd(p=>({...p,[t.id]:{...p[t.id],sub:newSub}}));
+                            // Auto-sugestão: se há outros pendentes com descrição semelhante sem categoria
+                            if(catA&&newSub){
+                              const descWords=t.desc.toUpperCase().split(/\s+/).slice(0,3).join(" ");
+                              const similares=pend.filter(o=>
+                                o.id!==t.id&&!o.ok&&
+                                o.desc.toUpperCase().includes(descWords)
+                              );
+                              if(similares.length>0&&confirm(`Encontrei ${similares.length} movimento(s) semelhante(s) a "${t.ent||t.desc}". Aplicar "${catA} / ${newSub}" a todos?`)){
+                                setPEd(p=>{
+                                  const next={...p};
+                                  similares.forEach(o=>{next[o.id]={...p[o.id],cat:catA,sub:newSub};});
+                                  return next;
+                                });
+                                setPend(prev=>prev.map(o=>
+                                  similares.some(s=>s.id===o.id) ? {...o,cat:catA,sub:newSub,ok:true} : o
+                                ));
+                              }
+                            }
+                          }}
                             style={{fontSize:12,padding:"5px 8px",width:"100%"}}>
                             <option value="">—</option>
                             {(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
