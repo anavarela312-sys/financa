@@ -662,15 +662,31 @@ export default function App(){
     setContas(prev => prev.map(c => c.id === "mill" ? {...c, saldo: millSaldo} : c));
   }, [millSaldo]);
 
-  // Migrate Alimentação/Supermercado → Casa/Supermercado
+  // Migrate Alimentação/Supermercado → Casa/Supermercado (trans + orcs)
   useEffect(() => {
     const needs = trans.filter(t=>t.cat==="Alimentação"&&t.sub==="Supermercado");
-    if(!needs.length) return;
-    setTrans(prev=>prev.map(t=>
-      t.cat==="Alimentação"&&t.sub==="Supermercado"
-        ? {...t, cat:"Casa", sub:"Supermercado"}
-        : t
-    ));
+    if(needs.length) {
+      setTrans(prev=>prev.map(t=>
+        t.cat==="Alimentação"&&t.sub==="Supermercado"
+          ? {...t, cat:"Casa", sub:"Supermercado"}
+          : t
+      ));
+    }
+    // Migrate orcs: rename "Alimentação::Supermercado" → "Casa::Supermercado" in all months
+    setOrcs(prev=>{
+      let changed=false;
+      const next={};
+      Object.entries(prev).forEach(([mk,mo])=>{
+        if(mo["Alimentação::Supermercado"]!=null){
+          changed=true;
+          const {["Alimentação::Supermercado"]:val,...rest}=mo;
+          next[mk]={...rest,"Casa::Supermercado":(rest["Casa::Supermercado"]||0)+val};
+        } else {
+          next[mk]=mo;
+        }
+      });
+      return changed?next:prev;
+    });
   }, []);
 
   // Compute real saldo per conta = saldoRef + movements after saldoRefData
