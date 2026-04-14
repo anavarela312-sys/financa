@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 
 const JSONBIN_KEY = "$2a$10$y53iHt0gLHnxq5urwPKidOkZSeReMZBPVHcEj.y80zx2YEa1.3Bc.";
 const JSONBIN_BIN = "69d3e796aaba882197cd93e9";
@@ -390,34 +390,101 @@ const EMP_OBRIGACOES = [
 const PLAN_LEVELS=[{id:1,name:"Fundo 3 Meses",target:10500,color:"#22c55e",desc:"Rede mínima"},{id:2,name:"Limpar Crédito",target:16000,color:"#f59e0b",desc:"Dívida eliminada"},{id:3,name:"Fundo 6 Meses",target:21000,color:"#06b6d4",desc:"Rede robusta"},{id:4,name:"Investimento",target:1050000,color:"#8b5cf6",desc:"Independência"}];
 
 
-const CSS=`
+// ── TEMA ─────────────────────────────────────────────────────
+const DARK_THEME = {
+  bg:       "#070d1a",
+  bgAlt:    "#0a1220",
+  bgCard:   "#0d1a2e",
+  bgInput:  "#0f1d2e",
+  border:   "#1e3048",
+  text:     "#e2e8f0",
+  textMid:  "#94a3b8",
+  textLow:  "#64748b",
+  textLow2: "#475569",
+  hover:    "#0d1a2e",
+  hoverRow: "rgba(255,255,255,0.04)",
+  hoverCat: "rgba(59,130,246,0.10)",
+  modalBg:  "rgba(0,0,0,0.7)",
+};
+const LIGHT_THEME = {
+  bg:       "#f0ece4",   // warm parchment
+  bgAlt:    "#e8e3d8",   // slightly darker warm
+  bgCard:   "#faf8f4",   // cream white
+  bgInput:  "#f5f2ec",   // input background
+  border:   "#d5cfc4",   // warm grey border
+  text:     "#1e2530",   // near-black warm
+  textMid:  "#4a5568",   // medium grey
+  textLow:  "#7a8694",   // low contrast
+  textLow2: "#9aa3ad",   // very low
+  hover:    "#ede9e0",
+  hoverRow: "rgba(0,0,0,0.03)",
+  hoverCat: "rgba(59,130,246,0.08)",
+  modalBg:  "rgba(0,0,0,0.45)",
+};
+
+function buildCSS(th) {
+  return `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-html,body,#root{height:100%;background:#070d1a;color:#e2e8f0;font-family:'DM Sans',sans-serif}
-input,select,textarea{font-family:'DM Sans',sans-serif;background:#0f1d2e;border:1px solid #1e3048;color:#e2e8f0;border-radius:10px;padding:10px 14px;font-size:14px;width:100%;outline:none;transition:border 0.15s;-webkit-appearance:none}
+html,body,#root{height:100%;background:${th.bg};color:${th.text};font-family:'DM Sans',sans-serif;transition:background 0.25s,color 0.25s}
+input,select,textarea{font-family:'DM Sans',sans-serif;background:${th.bgInput};border:1px solid ${th.border};color:${th.text};border-radius:10px;padding:10px 14px;font-size:14px;width:100%;outline:none;transition:border 0.15s;-webkit-appearance:none}
 input:focus,select:focus,textarea:focus{border-color:#3b82f6}
-select option{background:#0f1d2e}
+select option{background:${th.bgInput};color:${th.text}}
 button{font-family:'DM Sans',sans-serif;cursor:pointer;border:none;border-radius:10px;font-size:14px;font-weight:500;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
 button:active{transform:scale(0.97)}
-::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#1e3048;border-radius:4px}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:${th.border};border-radius:4px}
 .fade{animation:fi 0.3s ease}@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.hrow:hover{background:#0d1a2e}
-.tabbar{position:fixed;bottom:0;left:0;right:0;background:#0a1220;border-top:1px solid #1e3048;display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
-.tabbar button{flex:1;padding:10px 2px;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;color:#64748b;font-size:10px;font-weight:500}
+.hrow:hover{background:${th.hover}}
+.tabbar{position:fixed;bottom:0;left:0;right:0;background:${th.bgAlt};border-top:1px solid ${th.border};display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.tabbar button{flex:1;padding:10px 2px;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;color:${th.textLow};font-size:10px;font-weight:500}
 .tabbar button.act{color:#3b82f6}
 .catrow{transition:background 0.12s}
-.catrow:hover{background:rgba(59,130,246,0.10) !important}
-.trans-row:hover{background:rgba(255,255,255,0.04) !important}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:flex-end;justify-content:center}
-.modal{background:#0d1a2e;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto}
+.catrow:hover{background:${th.hoverCat} !important}
+.trans-row:hover{background:${th.hoverRow} !important}
+.modal-bg{position:fixed;inset:0;background:${th.modalBg};z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:${th.bgCard};border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto;border:1px solid ${th.border}}
 @media(min-width:640px){.modal-bg{align-items:center}.modal{border-radius:20px;max-height:80vh}}
+
+.card-default{background:${th.bgCard};border:1px solid ${th.border};border-radius:16px;padding:16px;margin-bottom:12px}
+.sidebar-bg{background:${th.bgAlt};border-right:1px solid ${th.border}}
+.topbar-bg{background:${th.bgAlt};border-bottom:1px solid ${th.border}}
+.day-header-bg{background:${th.bgAlt}}
+.chip-text{color:${th.text}}
 `;
+}
 
 function PBar({val,max,color="#3b82f6",h=6}){const pct=max>0?Math.min((val/max)*100,100):0;const over=val>max,warn=pct>75&&!over;return <div style={{background:"#1e3048",borderRadius:100,height:h,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",borderRadius:100,background:over?"#ef4444":warn?"#f59e0b":color,transition:"width 0.5s"}}/></div>;}
 function Chip({label,color,sm}){return <span style={{display:"inline-flex",padding:sm?"1px 7px":"2px 10px",borderRadius:20,background:color+"22",color,fontSize:sm?10:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>;}
-function Card({children,style={},onClick}){return <div onClick={onClick} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:16,padding:"16px",marginBottom:12,...style,cursor:onClick?"pointer":"default"}}>{children}</div>;}
-function Btn({children,variant="ghost",onClick,style={},full}){const bg=variant==="primary"?"#3b82f6":variant==="success"?"#22c55e":variant==="danger"?"rgba(239,68,68,0.12)":"rgba(255,255,255,0.05)";const color=variant==="primary"||variant==="success"?"#fff":variant==="danger"?"#ef4444":"#94a3b8";return <button onClick={onClick} style={{padding:"10px 16px",background:bg,color,border:variant==="ghost"?"1px solid #1e3048":"none",width:full?"100%":"auto",...style}}>{children}</button>;}
-function Lbl({children}){return <span style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>{children}</span>;}
+// Theme context — allows Card/Btn/Lbl to be theme-aware without prop drilling
+const ThemeCtx = React.createContext(null);
+function Card({children,style={},onClick}){
+  const th=React.useContext(ThemeCtx)||{bgCard:"#0d1a2e",border:"#1e3048"};
+  return <div onClick={onClick} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:16,padding:"16px",marginBottom:12,...style,cursor:onClick?"pointer":"default"}}>{children}</div>;
+}
+function Btn({children,variant="ghost",onClick,style={},full}){
+  const th=React.useContext(ThemeCtx)||{border:"#1e3048"};
+  const bg=variant==="primary"?"#3b82f6":variant==="success"?"#22c55e":variant==="danger"?"rgba(239,68,68,0.12)":`rgba(128,128,128,0.08)`;
+  const color=variant==="primary"||variant==="success"?"#fff":variant==="danger"?"#ef4444":th.textMid||"#94a3b8";
+  return <button onClick={onClick} style={{padding:"10px 16px",background:bg,color,border:variant==="ghost"?`1px solid ${th.border}`:"none",width:full?"100%":"auto",...style}}>{children}</button>;
+}
+function Lbl({children}){
+  const th=React.useContext(ThemeCtx)||{textLow:"#64748b"};
+  return <span style={{fontSize:11,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>{children}</span>;
+}
+function Modal({children,onClose}){
+  const th=React.useContext(ThemeCtx)||{bgCard:"#0d1a2e",border:"#1e3048",textMid:"#94a3b8"};
+  return(
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div/>
+          <button onClick={onClose} style={{background:`rgba(128,128,128,0.08)`,color:th.textMid,padding:"4px 12px",border:`1px solid ${th.border}`,fontSize:18,lineHeight:1}}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // ── PIE CHART ─────────────────────────────────────────────────
 function PieChart({data,size=160}){
@@ -464,6 +531,13 @@ export default function App(){
   const [tab,setTab]=useState("dashboard");
   const [fMes,setFMes]=useState(3);
   const [fAno,setFAno]=useState(2026);
+  const [darkMode,setDarkMode]=useState(()=>{try{return localStorage.getItem("fin_theme")!=="light";}catch{return true;}});
+  const th=darkMode?DARK_THEME:LIGHT_THEME;
+  const CSS=buildCSS(th);
+  const toggleTheme=()=>{const next=!darkMode;setDarkMode(next);try{localStorage.setItem("fin_theme",next?"dark":"light");}catch{}};
+  // Theme-aware helpers
+  const cardStyle=(extra={})=>({background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:16,padding:"16px",marginBottom:12,...extra});
+  const ThemeToggle=()=>(<button onClick={toggleTheme} title={darkMode?"Modo claro":"Modo escuro"} style={{background:"none",border:`1px solid ${th.border}`,borderRadius:20,padding:"4px 10px",fontSize:13,color:th.textMid,cursor:"pointer",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>{darkMode?"☀️":"🌙"}</button>);
 
   const [trans,setTrans,forceTrans]=useLS("fin_trans_v6",[]);
   const [pend,setPend,forcePend]=useLS("fin_pend_v6",[]);
@@ -863,6 +937,9 @@ export default function App(){
 
   // Cat transactions modal
   const catTransactions=catModal?(()=>{
+    if(catModal==="__SEM_CATEGORIA__")
+      return trans.filter(t=>!t.cat||(!t.sub&&cats[t.cat]?.subs?.length>0&&t.cat!=="Transferência Interna"&&t.cat!=="Receita"))
+        .sort((a,b)=>b.data.localeCompare(a.data));
     if(catModal.includes("::")){
       const [cat,sub]=catModal.split("::");
       return transMesTodos.filter(t=>t.cat===cat&&(t.sub===sub||(t.splits&&t.splits.some(s=>s.cat===cat&&s.sub===sub))));
@@ -870,7 +947,7 @@ export default function App(){
     if(catModal==="Receita") return transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t)&&!isCO(t));
     return transMesTodos.filter(t=>t.cat===catModal);
   })():[];
-  const catModalLabel=catModal?.includes("::")?catModal.split("::")[1]:catModal;
+  const catModalLabel=catModal==="__SEM_CATEGORIA__"?"Sem categoria / subcategoria":catModal?.includes("::")?catModal.split("::")[1]:catModal;
   const catModalCat=catModal?.includes("::")?catModal.split("::")[0]:catModal;
 
   const px=isMobile?"14px":"24px";
@@ -891,13 +968,15 @@ export default function App(){
 
   // ── LANDING ───────────────────────────────────────────────
   if(screen==="landing") return (
+    <ThemeCtx.Provider value={th}>
     <>
       <style>{CSS}</style>
-      <div className="fade" style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:`32px ${px}`,background:"linear-gradient(160deg,#070d1a 0%,#0d1a2e 60%,#070d1a 100%)"}}>
+      <div className="fade" style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:`32px ${px}`,background:darkMode?"linear-gradient(160deg,#070d1a 0%,#0d1a2e 60%,#070d1a 100%)":th.bg}}>
         <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{position:"absolute",top:16,right:16}}><ThemeToggle/></div>
           <div style={{fontSize:40,marginBottom:12}}>✦</div>
-          <h1 style={{fontSize:isMobile?34:44,fontWeight:300,color:"#fff",letterSpacing:-2,marginBottom:6}}>finança<span style={{color:"#3b82f6",fontWeight:600}}>.</span></h1>
-          <p style={{fontSize:13,color:"#64748b"}}>Hub financeiro pessoal · Ana · 2026</p>
+          <h1 style={{fontSize:isMobile?34:44,fontWeight:300,color:th.text,letterSpacing:-2,marginBottom:6}}>finança<span style={{color:"#3b82f6",fontWeight:600}}>.</span></h1>
+          <p style={{fontSize:13,color:th.textLow}}>Hub financeiro pessoal · Ana · 2026</p>
           {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:"#64748b"},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:"#64748b"};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
 
         </div>
@@ -1222,6 +1301,7 @@ export default function App(){
         </div>}
       </div>
     </>
+    </ThemeCtx.Provider>
   );
 
 
@@ -1768,19 +1848,23 @@ export default function App(){
 
   // ── PLANO ─────────────────────────────────────────────────
   if(screen==="plano") return (
+    <ThemeCtx.Provider value={th}>
     <>
       <style>{CSS}</style>
-      <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
-        <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
-          <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
-          <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>🎯 Liberdade Financeira</p>
-          <div style={{display:"flex",gap:0,marginLeft:"auto",background:"rgba(255,255,255,0.05)",borderRadius:10,padding:3}}>
-            {["plano","patrimonio"].map(t=>(
-              <button key={t} onClick={()=>setPlanoTab(t)}
-                style={{padding:"5px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:planoTab===t?"rgba(59,130,246,0.3)":"none",color:planoTab===t?"#fff":"#64748b",border:"none",cursor:"pointer"}}>
-                {t==="plano"?"📋 Plano":"💎 Património"}
-              </button>
-            ))}
+      <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0,background:th.bg,color:th.text}}>
+        <div style={{background:th.bgAlt,borderBottom:`1px solid ${th.border}`,padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
+          <button onClick={()=>setScreen("landing")} style={{background:`rgba(128,128,128,0.08)`,color:th.textMid,padding:"6px 12px",border:`1px solid ${th.border}`,fontSize:12,borderRadius:8}}>← Hub</button>
+          <p style={{fontSize:15,fontWeight:600,color:th.text}}>🎯 Liberdade Financeira</p>
+          <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
+            <div style={{display:"flex",gap:0,background:`rgba(128,128,128,0.08)`,borderRadius:10,padding:3}}>
+              {["plano","patrimonio"].map(t=>(
+                <button key={t} onClick={()=>setPlanoTab(t)}
+                  style={{padding:"5px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:planoTab===t?"rgba(59,130,246,0.3)":"none",color:planoTab===t?th.text:th.textLow,border:"none",cursor:"pointer"}}>
+                  {t==="plano"?"📋 Plano":"💎 Património"}
+                </button>
+              ))}
+            </div>
+            <ThemeToggle/>
           </div>
         </div>
         <div style={{padding:mainPad,maxWidth:isMobile?undefined:960,margin:"0 auto"}} className="fade">
@@ -2606,20 +2690,25 @@ export default function App(){
           <button onClick={()=>{setScreen("gestao");setTab("dashboard");}}><span style={{fontSize:18}}>💳</span>Gestão</button>
         </div>}
     </>
+    </ThemeCtx.Provider>
   );
 
   // ── GESTÃO MENSAL ─────────────────────────────────────────
   return (
+    <ThemeCtx.Provider value={th}>
     <>
       <style>{CSS}</style>
-      <div style={{display:"flex",minHeight:"100vh"}}>
+      <div style={{display:"flex",minHeight:"100vh",background:th.bg,color:th.text}}>
 
         {/* Desktop sidebar */}
         {!isMobile&&(
-          <div style={{width:210,background:"#0a1220",borderRight:"1px solid #1e3048",display:"flex",flexDirection:"column",padding:"16px 0",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto"}}>
+          <div style={{width:210,background:th.bgAlt,borderRight:`1px solid ${th.border}`,display:"flex",flexDirection:"column",padding:"16px 0",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto"}}>
             <div style={{padding:"0 16px 14px",borderBottom:"1px solid #1e3048",marginBottom:10}}>
-              <button onClick={()=>setScreen("landing")} style={{background:"none",color:"#64748b",padding:"3px 0",border:"none",fontSize:11,marginBottom:8,cursor:"pointer"}}>← Hub</button>
-              <p style={{fontSize:15,fontWeight:600,color:"#fff",letterSpacing:-0.5,marginBottom:8}}>finança<span style={{color:"#3b82f6"}}>.</span></p>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <button onClick={()=>setScreen("landing")} style={{background:"none",color:th.textLow,padding:"3px 0",border:"none",fontSize:11,cursor:"pointer"}}>← Hub</button>
+                <ThemeToggle/>
+              </div>
+              <p style={{fontSize:15,fontWeight:600,color:th.text,letterSpacing:-0.5,marginBottom:8}}>finança<span style={{color:"#3b82f6"}}>.</span></p>
               <div style={{position:"relative"}}>
                 <input placeholder="🔍 Pesquisa global..." value={globalSearch}
                   onChange={e=>{setGlobalSearch(e.target.value);setShowGlobalSearch(true);}}
@@ -2681,12 +2770,13 @@ export default function App(){
           {isMobile&&(
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <div>
-                <p style={{fontSize:17,fontWeight:600,color:"#fff"}}>{navItems.find(n=>n.id===tab)?.label||tab}</p>
-                <p style={{fontSize:11,color:"#64748b"}}>{MESES[fMes]} {fAno}</p>
+                <p style={{fontSize:17,fontWeight:600,color:th.text}}>{navItems.find(n=>n.id===tab)?.label||tab}</p>
+                <p style={{fontSize:11,color:th.textLow}}>{MESES[fMes]} {fAno}</p>
               </div>
-              <div style={{display:"flex",gap:6}}>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
                 <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{fontSize:12,padding:"6px 8px",width:"auto"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
                 <select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{fontSize:12,padding:"6px 6px",width:"auto"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
+                <ThemeToggle/>
               </div>
             </div>
           )}
@@ -3020,7 +3110,26 @@ export default function App(){
                 </select>
 
               </div>
-              <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{transMes.length} movimentos · {MESES[fMes]} {fAno}</p>
+              <p style={{fontSize:12,color:th.textLow,marginBottom:10}}>{transMes.length} movimentos · {MESES[fMes]} {fAno}</p>
+
+              {/* Card: movimentos sem categoria ou subcategoria */}
+              {(()=>{
+                const semCat=trans.filter(t=>!t.cat||(!t.sub&&cats[t.cat]?.subs?.length>0&&t.cat!=="Transferência Interna"&&t.cat!=="Receita"));
+                if(!semCat.length) return null;
+                return(
+                  <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:"10px 14px",marginBottom:12,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                    onClick={()=>setCatModal("__SEM_CATEGORIA__")}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:16}}>⚠️</span>
+                      <div>
+                        <p style={{fontSize:13,fontWeight:600,color:"#ef4444"}}>{semCat.length} movimento{semCat.length!==1?"s":""} sem categoria ou subcategoria</p>
+                        <p style={{fontSize:10,color:th.textLow}}>Clica para ver e navegar para cada um</p>
+                      </div>
+                    </div>
+                    <span style={{fontSize:12,color:"#ef4444"}}>›</span>
+                  </div>
+                );
+              })()}
 
               {/* Add manual transaction */}
               <div style={{marginBottom:12}}>
@@ -3120,7 +3229,7 @@ export default function App(){
                   return(
                     <div key={day} style={{marginBottom:4}}>
                       {/* Day header */}
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#0a1220",borderRadius:10,marginBottom:2,position:"sticky",top:0,zIndex:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:th.bgAlt,borderRadius:10,marginBottom:2,position:"sticky",top:0,zIndex:10}}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
                           <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{label}</span>
                           <div style={{display:"flex",gap:6}}>
@@ -3131,7 +3240,7 @@ export default function App(){
                         <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>{saldoDia!=null?fE(saldoDia):"—"}</span>
                       </div>
                       {/* Day transactions */}
-                      <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:10,overflow:"hidden"}}>
+                      <div style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:10,overflow:"hidden"}}>
                         {dayTrans.map((t,i)=>(
                           <div key={t.id} ref={highlightTransId===t.id?el=>{if(el){el.scrollIntoView({behavior:"smooth",block:"center"});}}:null}
                             style={{borderBottom:i<dayTrans.length-1?"1px solid #0a1220":"none",transition:"background 0.5s",background:highlightTransId===t.id?"rgba(59,130,246,0.18)":"transparent"}}>
@@ -3476,7 +3585,7 @@ export default function App(){
         {/* Mobile tab bar */}
         {isMobile&&(
           <div className="tabbar">
-            <button onClick={()=>setScreen("landing")} style={{fontSize:10,color:"#64748b",flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none"}}><span style={{fontSize:18}}>🏠</span>Hub</button>
+            <button onClick={()=>setScreen("landing")} style={{fontSize:10,color:th.textLow,flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none"}}><span style={{fontSize:18}}>🏠</span>Hub</button>
             {navItems.filter(n=>n.id!=="config").map(n=><button key={n.id} className={tab===n.id?"act":""} onClick={()=>setTab(n.id)}><span style={{fontSize:18}}>{n.icon}</span>{n.label}</button>)}
             <button className={configSubTabs.some(s=>s.id===tab)?"act":""} onClick={()=>setTab("contas")}><span style={{fontSize:18}}>⚙</span>Config</button>
           </div>
@@ -3486,12 +3595,12 @@ export default function App(){
       {/* MODAL: transações de uma categoria */}
       {catModal&&(
         <Modal onClose={()=>setCatModal(null)}>
-          <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:4}}>{cats[catModalCat]?.icon} {catModalLabel}</p>
-          {catModal?.includes("::")&&<p style={{fontSize:11,color:"#64748b",marginBottom:4}}>{cats[catModalCat]?.icon} {catModalCat}</p>}
-          <p style={{fontSize:12,color:"#64748b",marginBottom:14}}>{catTransactions.length} movimentos · {MESES[fMes]} {fAno}</p>
-          {catTransactions.length===0&&<p style={{color:"#64748b",fontSize:13}}>Sem movimentos nesta categoria.</p>}
+          <p style={{fontSize:16,fontWeight:600,color:th.text,marginBottom:4}}>{cats[catModalCat]?.icon||"⚠️"} {catModalLabel}</p>
+          {catModal?.includes("::")&&<p style={{fontSize:11,color:th.textLow,marginBottom:4}}>{cats[catModalCat]?.icon} {catModalCat}</p>}
+          <p style={{fontSize:12,color:th.textLow,marginBottom:14}}>{catTransactions.length} movimentos{catModal!=="__SEM_CATEGORIA__"?` · ${MESES[fMes]} ${fAno}`:""}</p>
+          {catTransactions.length===0&&<p style={{color:th.textLow,fontSize:13}}>Sem movimentos nesta categoria.</p>}
           {catTransactions.map(t=>(
-            <div key={t.id} className="hrow" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"9px 0",borderBottom:"1px solid #1e3048",cursor:"pointer"}} title="Clica para ver no tab Transações"
+            <div key={t.id} className="hrow" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"9px 0",borderBottom:`1px solid ${th.border}`,cursor:"pointer"}} title="Clica para ver no tab Transações"
               onClick={()=>{
                 const[y,m]=t.data.split("-");
                 setFAno(parseInt(y));setFMes(parseInt(m)-1);
@@ -3501,11 +3610,11 @@ export default function App(){
                 setCatModal(null);
               }}>
               <div style={{flex:1,minWidth:0,marginRight:8}}>
-                <p style={{fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.ent||t.desc}</p>
-                <p style={{fontSize:10,color:"#64748b"}}>{t.data.slice(5).split("-").reverse().join("/")} {t.sub&&`· ${t.sub}`} <span style={{color:"#3b82f6",fontSize:9}}>→ ver</span></p>
+                <p style={{fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:th.text}}>{t.ent||t.desc}</p>
+                <p style={{fontSize:10,color:th.textLow}}>{t.data.slice(5).split("-").reverse().join("/")} {t.sub&&`· ${t.sub}`}{!t.cat&&<span style={{color:"#ef4444"}}> · sem categoria</span>}{t.cat&&!t.sub&&<span style={{color:"#f59e0b"}}> · sem subcategoria</span>} <span style={{color:"#3b82f6",fontSize:9}}>→ ver</span></p>
                 {t.nota&&<p style={{fontSize:10,color:"#f59e0b"}}>📝 {t.nota}</p>}
               </div>
-              <span style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":"#e2e8f0",flexShrink:0}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
+              <span style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":th.text,flexShrink:0}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
             </div>
           ))}
           <div style={{marginTop:14,padding:"10px",background:"rgba(255,255,255,0.03)",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
@@ -3589,7 +3698,7 @@ export default function App(){
 
       {newCatModal&&(
         <Modal onClose={()=>setNewCatModal(false)}>
-          <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:16}}>Nova categoria</p>
+          <p style={{fontSize:16,fontWeight:600,color:th.text,marginBottom:16}}>Nova categoria</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
             <div style={{gridColumn:"1/-1"}}><Lbl>Nome</Lbl><input placeholder="Ex: Viagens" value={newCat.nome} onChange={e=>setNewCat(c=>({...c,nome:e.target.value}))}/></div>
             <div><Lbl>Ícone</Lbl><input placeholder="✈️" value={newCat.icon} onChange={e=>setNewCat(c=>({...c,icon:e.target.value}))}/></div>
@@ -3603,5 +3712,6 @@ export default function App(){
         </Modal>
       )}
     </>
+    </ThemeCtx.Provider>
   );
 }
