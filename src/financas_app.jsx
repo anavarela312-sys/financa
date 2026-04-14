@@ -200,6 +200,9 @@ function parseVal(s) {
 function parseLines(text, cats) {
   const lines = text.trim().split("\n").filter(l=>l.trim());
   const out = [];
+  // Track sequence per day — banco exporta mais recente primeiro dentro do mesmo dia
+  // seqInDay=0 = primeiro no ficheiro = mais recente = saldoExtrato é o correcto para fim do dia
+  const seqByDay = {};
   for (const line of lines) {
     const p = line.split("\t");
     if (p.length < 4) continue;
@@ -211,9 +214,12 @@ function parseLines(text, cats) {
     const cr = tipo?.toLowerCase().includes("créd") || val > 0;
     const r = autoCat(desc, cats);
     const saldoExtrato = p[4]?parseVal(p[4].trim()):null;
-    out.push({ id:crypto.randomUUID(), data:r?.d1?nextMonth(data):data, dataOrig:data, desc, val:Math.abs(val), tipo:cr?"c":"d", cat:r?.cat||"", sub:r?.sub||"", ent:r?.ent||"", nota:"", ok:!!r, contaId:"mill", saldoExtrato });
+    // seqInDay: posição dentro do mesmo dia no ficheiro original (0 = mais recente)
+    if(seqByDay[data]===undefined) seqByDay[data]=0; else seqByDay[data]++;
+    const seqInDay = seqByDay[data];
+    out.push({ id:crypto.randomUUID(), data:r?.d1?nextMonth(data):data, dataOrig:data, desc, val:Math.abs(val), tipo:cr?"c":"d", cat:r?.cat||"", sub:r?.sub||"", ent:r?.ent||"", nota:"", ok:!!r, contaId:"mill", saldoExtrato, seqInDay });
   }
-  return out.sort((a,b)=>b.data.localeCompare(a.data));
+  return out.sort((a,b)=>b.data.localeCompare(a.data)||(a.seqInDay??99)-(b.seqInDay??99));
 }
 
 const CONTA_SECOES = [
@@ -605,13 +611,14 @@ export default function App(){
     return (t.contaId||t.contaOrigem||"mill")===contaFiltro;
   });
 
-  // Running balance: sort by date, calculate saldo after each
+  // Running balance: sort by date then seqInDay (0=mais recente no ficheiro banco = topo do dia)
   const transMesWithBalance = useMemo(()=>{
-    const sorted=[...transMes].sort((a,b)=>a.data.localeCompare(b.data)||a.id.localeCompare(b.id));
-    // Prefer saldoExtrato from bank if available, otherwise calculate
-    return sorted.map(t=>{
-      return{...t, saldoApos: t.saldoExtrato!=null ? t.saldoExtrato : null};
-    }).reverse();
+    // Ordenar: data ASC, depois seqInDay ASC (0=mais recente do dia vem primeiro → fica no topo do grupo)
+    const sorted=[...transMes].sort((a,b)=>
+      a.data.localeCompare(b.data) ||
+      ((a.seqInDay??999)-(b.seqInDay??999))
+    );
+    return sorted.map(t=>({...t, saldoApos: t.saldoExtrato??null})).reverse();
   },[transMes]);
 
   const desp=transMesTodos.filter(t=>t.tipo==="d"&&!isInt(t)&&!isComprasOutros(t));
@@ -792,8 +799,8 @@ export default function App(){
 
   // Confirm all pre-filled at once
   const confirmAll=()=>{
-    const toConfirm=pend.filter(t=>t.ok&&!pEd[t.id]?.cat===undefined);
     const preenchidos=pend.filter(t=>t.ok);
+    const allToConfirm=[...pend]; // validate against all pending including uncategorized
     setTrans(prev=>{
       const ids=new Set(prev.map(t=>t.desc+t.data+t.val));
       const novos=preenchidos.filter(t=>!ids.has(t.desc+t.data+t.val));
@@ -803,6 +810,28 @@ export default function App(){
     setPend(remaining);
     if(!remaining.length)setTab("transacoes");
   };
+
+  // Dupla validação de saldo: chamada após confirmar TODOS os pendentes
+  const validarSaldoAposImport = useCallback((pendToValidate, transAtuais) => {
+    // Linha mais recente do import = menor seqInDay, maior data
+    const comSaldo = pendToValidate.filter(t=>t.saldoExtrato!=null&&t.contaId==="mill");
+    if(!comSaldo.length) return null;
+    // Ordenar por data DESC, seqInDay ASC → primeiro = mais recente do banco
+    const sorted = [...comSaldo].sort((a,b)=>
+      b.data.localeCompare(a.data) || (a.seqInDay??999)-(b.seqInDay??999)
+    );
+    const maisRecente = sorted[0];
+    const saldoBanco = maisRecente.saldoExtrato;
+    // Calcular saldo da conta mill a partir de todos os trans (incluindo os recém confirmados)
+    const allTrans = [...transAtuais, ...pendToValidate];
+    const millConta = contas.find(c=>c.id==="mill");
+    let saldoCalculado = null;
+    if(millConta?.saldoRef!=null && millConta?.saldoRefData) {
+      const movs = allTrans.filter(t=>(t.contaId||t.contaOrigem||"mill")==="mill" && t.data>millConta.saldoRefData);
+      saldoCalculado = millConta.saldoRef + movs.reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0);
+    }
+    return { saldoBanco, saldoCalculado, dataRef: maisRecente.data };
+  }, [contas]);
   const markInt=id=>{const t=pend.find(p=>p.id===id);if(!t)return;setTrans(prev=>[...prev,{...t,cat:"Transferência Interna",sub:"Outro",ok:true}]);const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");};
   const ignP=id=>{const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");};
   const saveEdit=id=>{setTrans(prev=>prev.map(t=>t.id===id?{...t,...editD}:t));setEditId(null);};
@@ -3078,8 +3107,11 @@ export default function App(){
                   byDay[byDay.length-1].trans.push(t);
                 });
                 return byDay.map(({day, trans:dayTrans})=>{
-                  // Saldo do fim do dia = saldoApos do último movimento do dia
-                  const saldoDia = dayTrans[dayTrans.length-1]?.saldoApos;
+                  // Saldo do fim do dia = saldoExtrato do movimento com seqInDay===0 (primeiro no ficheiro banco = mais recente = saldo após todos os movimentos do dia)
+                  // Fallback: primeiro movimento do array que tenha saldoExtrato definido
+                  const anchorTrans = dayTrans.find(t=>t.seqInDay===0&&t.saldoExtrato!=null)
+                    ?? dayTrans.find(t=>t.saldoExtrato!=null);
+                  const saldoDia = anchorTrans?.saldoApos ?? null;
                   const [ano,mes,dia] = day.split("-");
                   const label = `${dia} ${MESES[parseInt(mes)-1]} ${ano}`;
                   // Total entradas e saídas do dia
@@ -3180,8 +3212,23 @@ export default function App(){
                     if(pend.filter(t=>!t.ok).length===0)setTab("transacoes");
                   }}>✓ Confirmar {pend.filter(t=>t.ok).length} pré-preenchidos</Btn>
                   <Btn variant="primary" style={{fontSize:12,padding:"8px 16px"}} onClick={()=>{
+                    const validacao = validarSaldoAposImport(pend, trans);
                     setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...pend.filter(t=>!ids.has(t.desc+t.data+t.val))];});
-                    setPend([]);setTab("transacoes");
+                    setPend([]);
+                    setTab("transacoes");
+                    if(validacao){
+                      const {saldoBanco, saldoCalculado, dataRef} = validacao;
+                      if(saldoCalculado!==null){
+                        const desvio = saldoCalculado - saldoBanco;
+                        if(Math.abs(desvio)>0.02){
+                          setImportMsg(`⚠️ Desvio de saldo detectado em ${dataRef}: banco=${fE(saldoBanco)} · calculado=${fE(saldoCalculado)} · desvio=${desvio>0?"+":""}${fE(desvio)}. Verifica se falta algum movimento.`);
+                        } else {
+                          setImportMsg(`✓ Saldo validado: ${fE(saldoBanco)} em ${dataRef} · tudo bate certo.`);
+                        }
+                      } else {
+                        setImportMsg(`ℹ️ Saldo do banco: ${fE(saldoBanco)} em ${dataRef}. Define um saldo de referência em Configurações para validação automática.`);
+                      }
+                    }
                   }}>✓✓ Confirmar todos ({pend.length})</Btn>
                 </div>
               )}
