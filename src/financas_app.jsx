@@ -402,7 +402,7 @@ const DARK_THEME = {
   textLow:  "#64748b",
   textLow2: "#475569",
   hover:    "#0d1a2e",
-  hoverRow: "rgba(255,255,255,0.04)",
+  hoverRow: "rgba(0,0,0,0.04)",
   hoverCat: "rgba(59,130,246,0.10)",
   modalBg:  "rgba(0,0,0,0.7)",
 };
@@ -453,7 +453,11 @@ button:active{transform:scale(0.97)}
 `;
 }
 
-function PBar({val,max,color="#3b82f6",h=6}){const pct=max>0?Math.min((val/max)*100,100):0;const over=val>max,warn=pct>75&&!over;return <div style={{background:"#1e3048",borderRadius:100,height:h,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",borderRadius:100,background:over?"#ef4444":warn?"#f59e0b":color,transition:"width 0.5s"}}/></div>;}
+function PBar({val,max,color="#3b82f6",h=6}){
+  const th=React.useContext(ThemeCtx)||{border:"#1e3048"};
+  const pct=max>0?Math.min((val/max)*100,100):0;const over=val>max,warn=pct>75&&!over;
+  return <div style={{background:th.border,borderRadius:100,height:h,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",borderRadius:100,background:over?"#ef4444":warn?"#f59e0b":color,transition:"width 0.5s"}}/></div>;
+}
 function Chip({label,color,sm}){return <span style={{display:"inline-flex",padding:sm?"1px 7px":"2px 10px",borderRadius:20,background:color+"22",color,fontSize:sm?10:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>;}
 // Theme context — allows Card/Btn/Lbl to be theme-aware without prop drilling
 const ThemeCtx = React.createContext(null);
@@ -488,6 +492,7 @@ function Modal({children,onClose}){
 
 // ── PIE CHART ─────────────────────────────────────────────────
 function PieChart({data,size=160}){
+  const th=React.useContext(ThemeCtx)||{bg:"#070d1a",bgCard:"#0d1a2e"};
   const total=data.reduce((a,d)=>a+d.val,0);
   if(!total) return null;
   let cumAngle=0;
@@ -503,9 +508,9 @@ function PieChart({data,size=160}){
   return(
     <svg width={size} height={size} style={{flexShrink:0}}>
       {slices.map((s,i)=>(
-        <path key={i} d={describeArc(cx,cy,r,s.startAngle,s.startAngle+s.angle)} fill={s.color} stroke="#070d1a" strokeWidth={2}/>
+        <path key={i} d={describeArc(cx,cy,r,s.startAngle,s.startAngle+s.angle)} fill={s.color} stroke=th.bg strokeWidth={2}/>
       ))}
-      <circle cx={cx} cy={cy} r={r*0.55} fill="#0d1a2e"/>
+      <circle cx={cx} cy={cy} r={r*0.55} fill=th.bgCard/>
     </svg>
   );
 }
@@ -708,7 +713,7 @@ export default function App(){
     Object.entries(catData)
       .filter(([c])=>c!==""&&c!=="Receita"&&c!=="Transferência Interna"&&c!=="Poupança")
       .map(([cat,d])=>({
-        cat, val:NET_CATS.has(cat)?Math.max(0,d.out-d.in):d.out, color:cats[cat]?.color||"#64748b"
+        cat, val:NET_CATS.has(cat)?Math.max(0,d.out-d.in):d.out, color:cats[cat]?.color||th.textLow
       }))
       .filter(d=>d.val>0)
       .sort((a,b)=>b.val-a.val)
@@ -964,31 +969,31 @@ export default function App(){
           <div style={{fontSize:40,marginBottom:12}}>✦</div>
           <h1 style={{fontSize:isMobile?34:44,fontWeight:300,color:th.text,letterSpacing:-2,marginBottom:6}}>finança<span style={{color:"#3b82f6",fontWeight:600}}>.</span></h1>
           <p style={{fontSize:13,color:th.textLow}}>Hub financeiro pessoal · Ana · 2026</p>
-          {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:"#64748b"},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:"#64748b"};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
+          {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:th.textLow},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:th.textLow};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
 
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:480,marginBottom:24}}>
-          <div onClick={()=>setScreen("gestao")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="#3b82f6";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3048";}}>
+          <div onClick={()=>setScreen("gestao")} style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="#3b82f6";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=th.border;}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
               <div style={{fontSize:24,width:44,height:44,background:"rgba(59,130,246,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>💳</div>
-              <div><h2 style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:2}}>Gestão Mensal</h2><p style={{fontSize:12,color:"#64748b"}}>Extratos · Orçamento · Categorias</p></div>
+              <div><h2 style={{fontSize:16,fontWeight:600,color:th.text,marginBottom:2}}>Gestão Mensal</h2><p style={{fontSize:12,color:th.textLow}}>Extratos · Orçamento · Categorias</p></div>
               <span style={{marginLeft:"auto",color:"#3b82f6",fontSize:18}}>›</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Saldo Abr</p><p style={{fontSize:16,fontWeight:600,color:"#3b82f6"}}>{fE(totR-totD)}</p></div>
-              <div style={{background:"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Despesas</p><p style={{fontSize:16,fontWeight:600,color:"#ef4444"}}>{fE(totD)}</p></div>
+              <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Saldo Abr</p><p style={{fontSize:16,fontWeight:600,color:"#3b82f6"}}>{fE(totR-totD)}</p></div>
+              <div style={{background:"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}><p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Despesas</p><p style={{fontSize:16,fontWeight:600,color:"#ef4444"}}>{fE(totD)}</p></div>
             </div>
           </div>
-          <div onClick={()=>setScreen("plano")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="#22c55e";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3048";}}>
+          <div onClick={()=>setScreen("plano")} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="#22c55e";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=th.border;}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
               <div style={{fontSize:24,width:44,height:44,background:"rgba(34,197,94,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🎯</div>
-              <div><h2 style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:2}}>Liberdade Financeira</h2><p style={{fontSize:12,color:"#64748b"}}>4 Níveis · Progresso · Simulador</p></div>
+              <div><h2 style={{fontSize:16,fontWeight:600,color:th.text,marginBottom:2}}>Liberdade Financeira</h2><p style={{fontSize:12,color:th.textLow}}>4 Níveis · Progresso · Simulador</p></div>
               <span style={{marginLeft:"auto",color:"#22c55e",fontSize:18}}>›</span>
             </div>
             <div style={{marginBottom:8}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:"#64748b"}}>Nível 1</span><span style={{fontSize:11,fontWeight:600,color:"#22c55e"}}>{progressL1.toFixed(1)}%</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:th.textLow}}>Nível 1</span><span style={{fontSize:11,fontWeight:600,color:"#22c55e"}}>{progressL1.toFixed(1)}%</span></div>
               <PBar val={appSaldo} max={10500} color="#22c55e" h={7}/>
             </div>
             <div style={{display:"flex",gap:6,padding:"6px 10px",background:deviation>=0?"rgba(34,197,94,0.1)":"rgba(239,68,68,0.1)",borderRadius:8}}>
@@ -1000,14 +1005,14 @@ export default function App(){
         </div>
         <div style={{width:"100%",maxWidth:480}}>
           {/* Empresa card */}
-          <div onClick={()=>setScreen("empresa")} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:18,padding:20,marginBottom:12,cursor:"pointer",transition:"all 0.2s"}}
+          <div onClick={()=>setScreen("empresa")} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:18,padding:20,marginBottom:12,cursor:"pointer",transition:"all 0.2s"}}
             onMouseEnter={e=>{if(!isMobile){e.currentTarget.style.borderColor="#f59e0b";e.currentTarget.style.transform="translateY(-3px)";}}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3048";e.currentTarget.style.transform="translateY(0)";}}>
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=th.border;e.currentTarget.style.transform="translateY(0)";}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
               <div style={{fontSize:24,width:44,height:44,background:"rgba(245,158,11,0.1)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🏢</div>
               <div style={{flex:1}}>
-                <h2 style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:2}}>Linguagem Entusiasta</h2>
-                <p style={{fontSize:12,color:"#64748b"}}>P&L · Fiscal · Projeção Anual</p>
+                <h2 style={{fontSize:16,fontWeight:600,color:th.text,marginBottom:2}}>Linguagem Entusiasta</h2>
+                <p style={{fontSize:12,color:th.textLow}}>P&L · Fiscal · Projeção Anual</p>
               </div>
               <span style={{color:"#f59e0b",fontSize:18}}>›</span>
             </div>
@@ -1023,31 +1028,31 @@ export default function App(){
               return(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   <div style={{background:"rgba(34,197,94,0.08)",borderRadius:10,padding:"8px 12px"}}>
-                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Receita {MESES[new Date().getMonth()]}</p>
+                    <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Receita {MESES[new Date().getMonth()]}</p>
                     <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE(rec)}</p>
                   </div>
                   <div style={{background:res>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:10,padding:"8px 12px"}}>
-                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Resultado</p>
+                    <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Resultado</p>
                     <p style={{fontSize:14,fontWeight:600,color:res>=0?"#22c55e":"#ef4444"}}>{fE(res)}</p>
                   </div>
                   <div style={{background:"rgba(245,158,11,0.08)",borderRadius:10,padding:"8px 12px"}}>
-                    <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Próx. Obrigação</p>
+                    <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>Próx. Obrigação</p>
                     <p style={{fontSize:12,fontWeight:600,color:"#f59e0b"}}>{proxObrig?`${diasObrig}d`:"—"}</p>
-                    {proxObrig&&<p style={{fontSize:9,color:"#64748b"}}>{proxObrig.label}</p>}
+                    {proxObrig&&<p style={{fontSize:9,color:th.textLow}}>{proxObrig.label}</p>}
                   </div>
                 </div>
               );
             })()}
           </div>
 
-          <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:12,padding:"12px 16px",textAlign:"center",marginBottom:10}}>
-            <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total em Contas</p>
-            <p style={{fontSize:26,fontWeight:600,color:"#fff"}}>{fE(patrimonioTotal)}</p>
-            <p style={{fontSize:10,color:"#64748b",marginTop:3}}>Millennium + Caixinhas + Investimentos</p>
+          <div style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:12,padding:"12px 16px",textAlign:"center",marginBottom:10}}>
+            <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total em Contas</p>
+            <p style={{fontSize:26,fontWeight:600,color:th.text}}>{fE(patrimonioTotal)}</p>
+            <p style={{fontSize:10,color:th.textLow,marginTop:3}}>Millennium + Caixinhas + Investimentos</p>
           </div>
           <div style={{display:"flex",gap:8,marginTop:10}}>
             <button onClick={exportJSON} style={{flex:1,padding:"10px",background:"rgba(59,130,246,0.1)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,fontSize:12}}>↓ Exportar backup</button>
-            <label style={{flex:1,padding:"10px",background:"rgba(255,255,255,0.04)",color:"#94a3b8",border:"1px solid #1e3048",borderRadius:10,fontSize:12,cursor:"pointer",textAlign:"center",display:"block"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
+            <label style={{flex:1,padding:"10px",background:darkMode?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",color:th.textMid,border:`1px solid ${th.border}`,borderRadius:10,fontSize:12,cursor:"pointer",textAlign:"center",display:"block"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
           </div>
         </div>
       </div>
@@ -1059,9 +1064,9 @@ export default function App(){
     <>
       <style>{CSS}</style>
       <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
-        <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
-          <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
-          <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>💎 Património Líquido</p>
+        <div style={{background:th.bgAlt,borderBottom:`1px solid ${th.border}`,padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
+          <button onClick={()=>setScreen("landing")} style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,padding:"6px 12px",border:"1px solid ${${th.border}}",fontSize:12,borderRadius:8}}>← Hub</button>
+          <p style={{fontSize:15,fontWeight:600,color:th.text}}>💎 Património Líquido</p>
         </div>
 
         <div style={{padding:mainPad,maxWidth:isMobile?undefined:960,margin:"0 auto"}} className="fade">
@@ -1070,7 +1075,7 @@ export default function App(){
           {(()=>{
             const latest = patSnaps[patSnaps.length-1];
             const prev = patSnaps[patSnaps.length-2];
-            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Regista o primeiro mês abaixo.</p></Card>;
+            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow}}>Ainda sem dados. Regista o primeiro mês abaixo.</p></Card>;
             const totalAtivos = Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
             const totalPassivos = Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
             const patLiq = totalAtivos - totalPassivos;
@@ -1079,7 +1084,7 @@ export default function App(){
             const pct = prevPat ? ((patLiq-prevPat)/Math.abs(prevPat)*100) : null;
             return(
               <div style={{marginBottom:16}}>
-                <p style={{fontSize:13,color:"#64748b",marginBottom:10}}>{latest.mes} · último registo</p>
+                <p style={{fontSize:13,color:th.textLow,marginBottom:10}}>{latest.mes} · último registo</p>
                 <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:10}}>
                   {[
                     {label:"Total Ativos",val:totalAtivos,color:"#22c55e"},
@@ -1087,11 +1092,11 @@ export default function App(){
                     {label:"Património Líquido",val:patLiq,color:"#3b82f6"},
                     {label:"Variação vs mês ant.",val:diff,color:diff>=0?"#22c55e":"#ef4444",isPct:true,pct},
                   ].map(k=>(
-                    <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
-                      <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
+                    <div key={k.label} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:14,padding:"14px"}}>
+                      <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
                       {k.val!==null
                         ? <p style={{fontSize:18,fontWeight:700,color:k.color}}>{k.val>=0?"+":""}{fE(k.val)}</p>
-                        : <p style={{fontSize:14,color:"#64748b"}}>—</p>}
+                        : <p style={{fontSize:14,color:th.textLow}}>—</p>}
                       {k.isPct&&k.pct!==null&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
                     </div>
                   ))}
@@ -1103,13 +1108,13 @@ export default function App(){
           {/* Historical evolution */}
           {patSnaps.length>1&&(
             <Card>
-              <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução mensal</p>
+              <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>Evolução mensal</p>
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:500}}>
                   <thead>
-                    <tr style={{borderBottom:"1px solid #1e3048"}}>
+                    <tr style={{borderBottom:`1px solid ${th.border}`}}>
                       {["Mês","Ativos","Passivos","Património Líquido","Variação","Variação %"].map(h=>(
-                        <th key={h} style={{textAlign:"left",padding:"6px 10px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</th>
+                        <th key={h} style={{textAlign:"left",padding:"6px 10px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1128,8 +1133,8 @@ export default function App(){
                           <td style={{padding:"10px",color:"#22c55e"}}>{fE(totalA)}</td>
                           <td style={{padding:"10px",color:"#ef4444"}}>{fE(totalP)}</td>
                           <td style={{padding:"10px",fontWeight:700,color:"#3b82f6"}}>{fE(pat)}</td>
-                          <td style={{padding:"10px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
-                          <td style={{padding:"10px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
+                          <td style={{padding:"10px",color:diff===null?th.textLow:diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
+                          <td style={{padding:"10px",color:pct===null?th.textLow:pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
                         </tr>
                       );
                     })}
@@ -1142,7 +1147,7 @@ export default function App(){
           {/* Register / Edit month */}
           <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Registar mês</p>
+              <p style={{fontSize:14,fontWeight:600,color:th.text}}>Registar mês</p>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
                   onChange={e=>{
@@ -1159,14 +1164,14 @@ export default function App(){
             <p style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Ativos</p>
             {GRUPOS_ATIVOS.map(grupo=>(
               <div key={grupo.id} style={{marginBottom:14}}>
-                <p style={{fontSize:11,color:"#64748b",marginBottom:8,display:"flex",alignItems:"center",gap:6}}><span>{grupo.icon}</span>{grupo.label}</p>
+                <p style={{fontSize:11,color:th.textLow,marginBottom:8,display:"flex",alignItems:"center",gap:6}}><span>{grupo.icon}</span>{grupo.label}</p>
                 {PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).map(item=>{
                   const d=patDraft.ativos[item.id]||{valor:"",investido:""};
                   return(
-                    <div key={item.id} style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(255,255,255,0.02)",borderRadius:10,borderLeft:`3px solid ${item.color}44`}}>
+                    <div key={item.id} style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:darkMode?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.02)",borderRadius:10,borderLeft:`3px solid ${item.color}44`}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontSize:16}}>{item.icon}</span>
-                        <span style={{fontSize:13,color:"#e2e8f0"}}>{item.label}</span>
+                        <span style={{fontSize:13,color:th.text}}>{item.label}</span>
                       </div>
                       <div>
                         <Lbl>Valor atual (€)</Lbl>
@@ -1203,7 +1208,7 @@ export default function App(){
                 <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(239,68,68,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:16}}>{item.icon}</span>
-                    <span style={{fontSize:13,color:"#e2e8f0"}}>{item.label}</span>
+                    <span style={{fontSize:13,color:th.text}}>{item.label}</span>
                   </div>
                   <div>
                     <Lbl>Capital em dívida (€)</Lbl>
@@ -1223,7 +1228,7 @@ export default function App(){
                 <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(245,158,11,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:16}}>{item.icon}</span>
-                    <span style={{fontSize:13,color:"#e2e8f0"}}>{item.label}</span>
+                    <span style={{fontSize:13,color:th.text}}>{item.label}</span>
                   </div>
                   <div>
                     <Lbl>Valor (€)</Lbl>
@@ -1241,7 +1246,7 @@ export default function App(){
               const snap={mes,ativos:patDraft.ativos,passivos:patDraft.passivos,empresa:patDraft.empresa};
               setPatSnaps(prev=>{const filtered=prev.filter(s=>s.mes!==mes);return[...filtered,snap].sort((a,b)=>a.mes.localeCompare(b.mes));});
               setPatDraft({ativos:{},passivos:{},empresa:{}});
-            }} style={{width:"100%",background:"#22c55e",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,marginTop:16,cursor:"pointer"}}>
+            }} style={{width:"100%",background:"#22c55e",color:th.text,border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,marginTop:16,cursor:"pointer"}}>
               ✓ Guardar {patEdit||new Date().toISOString().slice(0,7)}
             </button>
           </Card>
@@ -1254,7 +1259,7 @@ export default function App(){
             if(!hasData) return null;
             return(
               <Card>
-                <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>📈 Detalhe de Investimentos — {latest.mes}</p>
+                <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>📈 Detalhe de Investimentos — {latest.mes}</p>
                 {invItems.map(item=>{
                   const d=latest.ativos?.[item.id];
                   if(!d?.valor) return null;
@@ -1266,8 +1271,8 @@ export default function App(){
                       <div style={{flex:1}}>
                         <p style={{fontSize:13,fontWeight:500,marginBottom:3}}>{item.label}</p>
                         <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                          {d.investido&&<span style={{fontSize:11,color:"#64748b"}}>Investido: {fE(d.investido)}</span>}
-                          <span style={{fontSize:11,color:"#fff"}}>Atual: {fE(d.valor)}</span>
+                          {d.investido&&<span style={{fontSize:11,color:th.textLow}}>Investido: {fE(d.investido)}</span>}
+                          <span style={{fontSize:11,color:th.text}}>Atual: {fE(d.valor)}</span>
                           {d.investido&&<span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE(Math.abs(ganho))} {pct!==null?`(${pct>=0?"+":""}${pct.toFixed(1)}%)`:""}</span>}
                         </div>
                         {d.investido&&<PBar val={d.valor} max={Math.max(d.valor,d.investido)} color={ganho>=0?"#22c55e":"#ef4444"}/>}
@@ -1385,14 +1390,14 @@ export default function App(){
         <style>{CSS}</style>
         <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
           {/* Header */}
-          <div style={{background:"#0a1220",borderBottom:"1px solid #1e3048",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:8,position:"sticky",top:0,zIndex:50,flexWrap:"wrap"}}>
-            <button onClick={()=>setScreen("landing")} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"6px 12px",border:"1px solid #1e3048",fontSize:12,borderRadius:8}}>← Hub</button>
-            <p style={{fontSize:15,fontWeight:600,color:"#fff"}}>🏢 Linguagem Entusiasta</p>
+          <div style={{background:th.bgAlt,borderBottom:"1px solid ${${th.border}}",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:8,position:"sticky",top:0,zIndex:50,flexWrap:"wrap"}}>
+            <button onClick={()=>setScreen("landing")} style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,padding:"6px 12px",border:"1px solid ${${th.border}}",fontSize:12,borderRadius:8}}>← Hub</button>
+            <p style={{fontSize:15,fontWeight:600,color:th.text}}>🏢 Linguagem Entusiasta</p>
             {/* Tabs */}
-            <div style={{display:"flex",gap:0,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:3,marginLeft:"auto"}}>
+            <div style={{display:"flex",gap:0,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:10,padding:3,marginLeft:"auto"}}>
               {[{id:"mensal",label:"📅 Mensal"},{id:"anual",label:"📈 Anual"}].map(t=>(
                 <button key={t.id} onClick={()=>setEmpTab(t.id)}
-                  style={{padding:"5px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:empTab===t.id?"rgba(245,158,11,0.3)":"none",color:empTab===t.id?"#fff":"#64748b",border:"none",cursor:"pointer"}}>
+                  style={{padding:"5px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:empTab===t.id?"rgba(245,158,11,0.3)":"none",color:empTab===t.id?th.text:th.textLow,border:"none",cursor:"pointer"}}>
                   {t.label}
                 </button>
               ))}
@@ -1410,24 +1415,24 @@ export default function App(){
             <div style={{display:empTab==="mensal"?"block":"none"}}>
 
               {/* Receita s/IVA · IVA · c/IVA */}
-              <div style={{background:"#0d1a2e",border:"1px solid rgba(34,197,94,0.3)",borderRadius:14,padding:"14px",marginBottom:10}}>
-                <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
+              <div style={{background:th.bgCard,border:"1px solid rgba(34,197,94,0.3)",borderRadius:14,padding:"14px",marginBottom:10}}>
+                <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
                   💰 Receita {MESES[fMes]} — {diasReais} dias × {fE(EMP_TAXA_DIARIA)}
                 </p>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   <div style={{background:"rgba(34,197,94,0.08)",borderRadius:10,padding:"10px 12px"}}>
-                    <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>s/ IVA</p>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:4}}>s/ IVA</p>
                     <p style={{fontSize:18,fontWeight:700,color:"#22c55e"}}>{fE(receitaBruta)}</p>
                   </div>
                   <div style={{background:"rgba(245,158,11,0.08)",borderRadius:10,padding:"10px 12px"}}>
-                    <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>IVA (23%)</p>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:4}}>IVA (23%)</p>
                     <p style={{fontSize:18,fontWeight:700,color:"#f59e0b"}}>{fE(ivaRecebido)}</p>
-                    <p style={{fontSize:9,color:"#64748b",marginTop:2}}>↗ reservar</p>
+                    <p style={{fontSize:9,color:th.textLow,marginTop:2}}>↗ reservar</p>
                   </div>
                   <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"10px 12px"}}>
-                    <p style={{fontSize:10,color:"#64748b",marginBottom:4}}>c/ IVA</p>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:4}}>c/ IVA</p>
                     <p style={{fontSize:18,fontWeight:700,color:"#3b82f6"}}>{fE(receitaBruta+ivaRecebido)}</p>
-                    <p style={{fontSize:9,color:"#64748b",marginTop:2}}>recebido a dia 17</p>
+                    <p style={{fontSize:9,color:th.textLow,marginTop:2}}>recebido a dia 17</p>
                   </div>
                 </div>
               </div>
@@ -1439,10 +1444,10 @@ export default function App(){
                   {label:"Resultado",val:resultado,color:resultado>=0?"#22c55e":"#ef4444",sub:resultado>=0?"✓ Positivo":"⚠ Negativo"},
                   {label:"Saldo Conta",val:empData.saldoConta||0,color:"#a855f7",sub:"actualizar manualmente"},
                 ].map(k=>(
-                  <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:14,padding:"14px"}}>
-                    <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                  <div key={k.label} style={{background:th.bgCard,border:`1px solid ${k.color}33`,borderRadius:14,padding:"14px"}}>
+                    <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
                     <p style={{fontSize:18,fontWeight:700,color:k.color}}>{fE(k.val)}</p>
-                    {k.sub&&<p style={{fontSize:10,color:"#64748b",marginTop:3}}>{k.sub}</p>}
+                    {k.sub&&<p style={{fontSize:10,color:th.textLow,marginTop:3}}>{k.sub}</p>}
                   </div>
                 ))}
               </div>
@@ -1450,37 +1455,37 @@ export default function App(){
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
                 {/* Dias trabalhados */}
                 <Card>
-                  <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📅 Dias Trabalhados — {MESES[fMes]}</p>
+                  <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:12}}>📅 Dias Trabalhados — {MESES[fMes]}</p>
                   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
                     <div style={{flex:1}}>
-                      <p style={{fontSize:11,color:"#64748b",marginBottom:4}}>Dias úteis base</p>
-                      <p style={{fontSize:16,fontWeight:600,color:"#94a3b8"}}>{diasBase} dias</p>
+                      <p style={{fontSize:11,color:th.textLow,marginBottom:4}}>Dias úteis base</p>
+                      <p style={{fontSize:16,fontWeight:600,color:th.textMid}}>{diasBase} dias</p>
                     </div>
                     <div style={{flex:1}}>
-                      <p style={{fontSize:11,color:"#64748b",marginBottom:4}}>Dias reais</p>
+                      <p style={{fontSize:11,color:th.textLow,marginBottom:4}}>Dias reais</p>
                       <input type="number" value={diasReais} min={0} max={31}
                         onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[empMesKey]:parseInt(e.target.value)||0}}))}
                         style={{fontSize:20,fontWeight:700,color:"#22c55e",background:"none",border:"none",borderBottom:"2px solid #22c55e",borderRadius:0,padding:"2px 4px",width:60,textAlign:"center"}}/>
                     </div>
                     <div style={{flex:1}}>
-                      <p style={{fontSize:11,color:"#64748b",marginBottom:4}}>Receita s/IVA</p>
+                      <p style={{fontSize:11,color:th.textLow,marginBottom:4}}>Receita s/IVA</p>
                       <p style={{fontSize:16,fontWeight:600,color:"#22c55e"}}>{fE(receitaBruta)}</p>
                     </div>
                   </div>
                   <PBar val={diasReais} max={diasBase} color="#22c55e"/>
                   {isSubsidio&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(245,158,11,0.1)",borderRadius:8}}>
                     <p style={{fontSize:11,color:"#f59e0b"}}>⚠️ Mês de subsídio — custo extra: {fE(subsidioExtra)}</p>
-                    <p style={{fontSize:10,color:"#64748b"}}>Salário {fE(despMes["salario"]||1000)} + TSU {fE(despMes["tsu"]||347.50)} + IRS {fE(despMes["irs_ret"]||14)}</p>
+                    <p style={{fontSize:10,color:th.textLow}}>Salário {fE(despMes["salario"]||1000)} + TSU {fE(despMes["tsu"]||347.50)} + IRS {fE(despMes["irs_ret"]||14)}</p>
                   </div>}
                 </Card>
 
                 {/* Próximas obrigações */}
                 <Card>
-                  <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📆 Próximas Obrigações</p>
+                  <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:12}}>📆 Próximas Obrigações</p>
                   {proximasObrig.map(o=>{
                     const dias=Math.ceil((new Date(o.data)-hoje)/(1000*60*60*24));
                     const cor=dias<=30?"#ef4444":dias<=60?"#f59e0b":"#22c55e";
-                    const tipoColor=o.tipo==="iva"?"#f59e0b":o.tipo==="irc"?"#3b82f6":"#94a3b8";
+                    const tipoColor=o.tipo==="iva"?"#f59e0b":o.tipo==="irc"?"#3b82f6":th.textMid;
                     return(
                       <div key={o.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #0d1a2e"}}>
                         <div style={{width:36,height:36,borderRadius:8,background:tipoColor+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -1488,10 +1493,10 @@ export default function App(){
                         </div>
                         <div style={{flex:1}}>
                           <p style={{fontSize:12,fontWeight:500}}>{o.label}</p>
-                          <p style={{fontSize:10,color:"#64748b"}}>{o.data}</p>
+                          <p style={{fontSize:10,color:th.textLow}}>{o.data}</p>
                         </div>
                         <div style={{textAlign:"right"}}>
-                          {o.valor_est&&<p style={{fontSize:12,fontWeight:600,color:"#fff"}}>{fE(o.valor_est)}</p>}
+                          {o.valor_est&&<p style={{fontSize:12,fontWeight:600,color:th.text}}>{fE(o.valor_est)}</p>}
                           <p style={{fontSize:11,fontWeight:600,color:cor}}>{dias}d</p>
                         </div>
                       </div>
@@ -1502,12 +1507,12 @@ export default function App(){
 
               {/* Despesas do mês — editáveis */}
               <Card>
-                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>💸 Despesas — {MESES[fMes]} {fAno}</p>
+                <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:12}}>💸 Despesas — {MESES[fMes]} {fAno}</p>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                   <thead>
-                    <tr style={{background:"#0a1220"}}>
+                    <tr style={{background:th.bgAlt}}>
                       {["Despesa","Base","Real","Δ"].map(h=>(
-                        <th key={h} style={{textAlign:h==="Despesa"?"left":"right",padding:"7px 10px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                        <th key={h} style={{textAlign:h==="Despesa"?"left":"right",padding:"7px 10px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1522,17 +1527,17 @@ export default function App(){
                               <span>{d.icon}</span>
                               <div>
                                 <p style={{fontSize:12}}>{d.label}</p>
-                                {d.nota&&<p style={{fontSize:10,color:"#64748b"}}>{d.nota}</p>}
+                                {d.nota&&<p style={{fontSize:10,color:th.textLow}}>{d.nota}</p>}
                               </div>
                             </div>
                           </td>
-                          <td style={{padding:"7px 10px",textAlign:"right",color:"#64748b"}}>{fE(d.valor)}</td>
+                          <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow}}>{fE(d.valor)}</td>
                           <td style={{padding:"4px 6px",textAlign:"right"}}>
                             <input type="number" value={real} step="0.01"
                               onChange={e=>setEmpData(p=>({...p,despesasReais:{...p.despesasReais,[empMesKey]:{...(p.despesasReais?.[empMesKey]||{}),[d.id]:parseFloat(e.target.value)||0}}}))}
                               style={{textAlign:"right",width:100,fontSize:12,padding:"4px 6px"}}/>
                           </td>
-                          <td style={{padding:"7px 10px",textAlign:"right",color:diff===0?"#64748b":diff>0?"#ef4444":"#22c55e",fontWeight:diff!==0?600:400}}>
+                          <td style={{padding:"7px 10px",textAlign:"right",color:diff===0?th.textLow:diff>0?"#ef4444":"#22c55e",fontWeight:diff!==0?600:400}}>
                             {diff===0?"—":`${diff>0?"+":""}${fE(diff)}`}
                           </td>
                         </tr>
@@ -1552,13 +1557,13 @@ export default function App(){
                               </div>
                             </div>
                           </td>
-                          <td style={{padding:"7px 10px",textAlign:"right",color:"#64748b"}}>{fE(d.valor)}</td>
+                          <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow}}>{fE(d.valor)}</td>
                           <td style={{padding:"4px 6px",textAlign:"right"}}>
                             <input type="number" value={real} step="0.01"
                               onChange={e=>setEmpData(p=>({...p,despesasReais:{...p.despesasReais,[empMesKey]:{...(p.despesasReais?.[empMesKey]||{}),[d.id]:parseFloat(e.target.value)||0}}}))}
                               style={{textAlign:"right",width:100,fontSize:12,padding:"4px 6px"}}/>
                           </td>
-                          <td style={{padding:"7px 10px",textAlign:"right",color:diff>0?"#ef4444":diff<0?"#22c55e":"#64748b"}}>{diff===0?"—":`${diff>0?"+":""}${fE(diff)}`}</td>
+                          <td style={{padding:"7px 10px",textAlign:"right",color:diff>0?"#ef4444":diff<0?"#22c55e":th.textLow}}>{diff===0?"—":`${diff>0?"+":""}${fE(diff)}`}</td>
                         </tr>
                       );
                     })}
@@ -1571,7 +1576,7 @@ export default function App(){
                     )}
                     <tr style={{background:"rgba(239,68,68,0.08)",borderTop:"2px solid rgba(239,68,68,0.3)"}}>
                       <td style={{padding:"9px 10px",fontWeight:700,color:"#ef4444"}}>TOTAL</td>
-                      <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b",fontWeight:600}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
+                      <td style={{padding:"9px 10px",textAlign:"right",color:th.textLow,fontWeight:600}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
                       <td style={{padding:"9px 10px",textAlign:"right",fontWeight:700,color:"#ef4444"}}>{fE(totalDespesas)}</td>
                       <td/>
                     </tr>
@@ -1588,8 +1593,8 @@ export default function App(){
               <Card>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                   <div>
-                    <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>➕ Despesas Variáveis — {MESES[fMes]}</p>
-                    <p style={{fontSize:10,color:"#64748b",marginTop:2}}>Refeições negócio, representação, outros pontuais</p>
+                    <p style={{fontSize:13,fontWeight:600,color:th.text}}>➕ Despesas Variáveis — {MESES[fMes]}</p>
+                    <p style={{fontSize:10,color:th.textLow,marginTop:2}}>Refeições negócio, representação, outros pontuais</p>
                   </div>
                   <button onClick={()=>setEmpData(p=>{
                     const cur=p.despesasVar?.[empMesKey]||[];
@@ -1599,13 +1604,13 @@ export default function App(){
                   </button>
                 </div>
 
-                {despVar.length===0&&<p style={{fontSize:12,color:"#64748b",textAlign:"center",padding:"12px 0"}}>Sem despesas variáveis este mês.</p>}
+                {despVar.length===0&&<p style={{fontSize:12,color:th.textLow,textAlign:"center",padding:"12px 0"}}>Sem despesas variáveis este mês.</p>}
 
                 {despVar.map((d,i)=>{
                   const catInfo=EMP_CATS_VARIAVEIS.find(c=>c.id===d.cat);
                   const ta=(d.valor||0)*(catInfo?.ta||0);
                   return(
-                    <div key={d.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 90px 70px 28px",gap:6,marginBottom:8,padding:"8px 10px",background:"rgba(255,255,255,0.02)",borderRadius:10,alignItems:"center"}}>
+                    <div key={d.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 90px 70px 28px",gap:6,marginBottom:8,padding:"8px 10px",background:darkMode?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.02)",borderRadius:10,alignItems:"center"}}>
                       <div>
                         <Lbl>Categoria</Lbl>
                         <select value={d.cat}
@@ -1636,18 +1641,18 @@ export default function App(){
                 })}
 
                 {despVar.length>0&&(
-                  <div style={{marginTop:10,borderTop:"1px solid #1e3048",paddingTop:10}}>
+                  <div style={{marginTop:10,borderTop:"1px solid ${${th.border}}",paddingTop:10}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                      <span style={{fontSize:12,color:"#64748b"}}>Total despesas variáveis</span>
+                      <span style={{fontSize:12,color:th.textLow}}>Total despesas variáveis</span>
                       <span style={{fontSize:13,fontWeight:600,color:"#ef4444"}}>{fE(totalDespVar)}</span>
                     </div>
                     {totalTA>0&&<>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                        <span style={{fontSize:12,color:"#64748b"}}>TA ajudas de custo (5% × {fE(despMes["ajudas"]||750)})</span>
+                        <span style={{fontSize:12,color:th.textLow}}>TA ajudas de custo (5% × {fE(despMes["ajudas"]||750)})</span>
                         <span style={{fontSize:12,color:"#f59e0b"}}>{fE(taAjudas)}</span>
                       </div>
                       {taRep>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                        <span style={{fontSize:12,color:"#64748b"}}>TA representação (10%)</span>
+                        <span style={{fontSize:12,color:th.textLow}}>TA representação (10%)</span>
                         <span style={{fontSize:12,color:"#f59e0b"}}>{fE(taRep)}</span>
                       </div>}
                       <div style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",background:"rgba(245,158,11,0.08)",borderRadius:8,marginTop:4}}>
@@ -1659,7 +1664,7 @@ export default function App(){
                 )}
                 {/* Always show TA on ajudas */}
                 {despVar.length===0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",background:"rgba(245,158,11,0.06)",borderRadius:8,marginTop:8}}>
-                  <span style={{fontSize:11,color:"#64748b"}}>TA ajudas de custo (5% × {fE(despMes["ajudas"]||750)})</span>
+                  <span style={{fontSize:11,color:th.textLow}}>TA ajudas de custo (5% × {fE(despMes["ajudas"]||750)})</span>
                   <span style={{fontSize:11,fontWeight:600,color:"#f59e0b"}}>{fE(taAjudas)}</span>
                 </div>}
               </Card>
@@ -1677,8 +1682,8 @@ export default function App(){
                   {label:"Despesas Total",val:totalDesp,color:"#ef4444"},
                   {label:"Resultado Bruto",val:totalRes,color:totalRes>=0?"#22c55e":"#ef4444"},
                 ].map(k=>(
-                  <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:14,padding:"14px"}}>
-                    <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                  <div key={k.label} style={{background:th.bgCard,border:`1px solid ${k.color}33`,borderRadius:14,padding:"14px"}}>
+                    <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
                     <p style={{fontSize:18,fontWeight:700,color:k.color}}>{fE(k.val)}</p>
                   </div>
                 ))}
@@ -1686,67 +1691,67 @@ export default function App(){
 
               {/* IRC + resultado líquido */}
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10,marginBottom:12}}>
-                <div style={{background:"#0d1a2e",border:"1px solid rgba(168,85,247,0.3)",borderRadius:14,padding:"14px"}}>
-                  <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Carga Fiscal estimada</p>
+                <div style={{background:th.bgCard,border:"1px solid rgba(168,85,247,0.3)",borderRadius:14,padding:"14px"}}>
+                  <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Carga Fiscal estimada</p>
                   <div style={{display:"flex",flexDirection:"column",gap:4}}>
                     <div style={{display:"flex",justifyContent:"space-between"}}>
-                      <span style={{fontSize:11,color:"#64748b"}}>IRC (17% PME)</span>
+                      <span style={{fontSize:11,color:th.textLow}}>IRC (17% PME)</span>
                       <span style={{fontSize:12,fontWeight:600,color:"#a855f7"}}>{totalRes>0?fE(totalRes*0.17):"—"}</span>
                     </div>
                     <div style={{display:"flex",justifyContent:"space-between"}}>
-                      <span style={{fontSize:11,color:"#64748b"}}>Tributações autónomas</span>
+                      <span style={{fontSize:11,color:th.textLow}}>Tributações autónomas</span>
                       <span style={{fontSize:12,fontWeight:600,color:"#f59e0b"}}>{fE(totalTAAnual)}</span>
                     </div>
-                    <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid #1e3048",paddingTop:4,marginTop:2}}>
-                      <span style={{fontSize:11,fontWeight:600,color:"#fff"}}>Total fiscal</span>
+                    <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid ${${th.border}}",paddingTop:4,marginTop:2}}>
+                      <span style={{fontSize:11,fontWeight:600,color:th.text}}>Total fiscal</span>
                       <span style={{fontSize:13,fontWeight:700,color:"#a855f7"}}>{totalRes>0?fE(totalRes*0.17+totalTAAnual):fE(totalTAAnual)}</span>
                     </div>
                   </div>
-                  <p style={{fontSize:10,color:"#64748b",marginTop:8}}>PPC: 3×{fE(134)} = {fE(402)} · Acerto Mai 2027</p>
+                  <p style={{fontSize:10,color:th.textLow,marginTop:8}}>PPC: 3×{fE(134)} = {fE(402)} · Acerto Mai 2027</p>
                 </div>
-                <div style={{background:"#0d1a2e",border:`1px solid ${totalRes>0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:14,padding:"14px"}}>
-                  <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Resultado líquido estimado</p>
+                <div style={{background:th.bgCard,border:`1px solid ${totalRes>0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:14,padding:"14px"}}>
+                  <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Resultado líquido estimado</p>
                   <p style={{fontSize:22,fontWeight:700,color:totalRes>0?"#22c55e":"#ef4444"}}>
                     {totalRes>0?fE(totalRes*0.17+totalTAAnual>totalRes?0:totalRes-(totalRes*0.17+totalTAAnual)):fE(totalRes)}
                   </p>
-                  <p style={{fontSize:10,color:"#64748b",marginTop:4}}>Após IRC + Tributações Autónomas</p>
-                  <p style={{fontSize:10,color:"#64748b"}}>Margem média: {fE((totalRes>0?totalRes*0.83:totalRes)/12)}/mês</p>
+                  <p style={{fontSize:10,color:th.textLow,marginTop:4}}>Após IRC + Tributações Autónomas</p>
+                  <p style={{fontSize:10,color:th.textLow}}>Margem média: {fE((totalRes>0?totalRes*0.83:totalRes)/12)}/mês</p>
                 </div>
               </div>
 
               {/* IVA por trimestre */}
               <Card>
-                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:10}}>🧾 IVA por Trimestre</p>
+                <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:10}}>🧾 IVA por Trimestre</p>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:10}}>
                   {ivaQ.map(q=>{
                     const passado=new Date(q.data)<hoje;
                     return(
-                      <div key={q.label} style={{background:"rgba(245,158,11,0.06)",border:`1px solid ${passado?"#1e3048":"rgba(245,158,11,0.2)"}`,borderRadius:10,padding:"10px 12px"}}>
+                      <div key={q.label} style={{background:"rgba(245,158,11,0.06)",border:`1px solid ${passado?th.border:"rgba(245,158,11,0.2)"}`,borderRadius:10,padding:"10px 12px"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                          <p style={{fontSize:11,fontWeight:600,color:passado?"#64748b":"#f59e0b"}}>{q.label}</p>
-                          <p style={{fontSize:10,color:"#64748b"}}>{q.data.slice(5)}</p>
+                          <p style={{fontSize:11,fontWeight:600,color:passado?th.textLow:"#f59e0b"}}>{q.label}</p>
+                          <p style={{fontSize:10,color:th.textLow}}>{q.data.slice(5)}</p>
                         </div>
-                        <p style={{fontSize:16,fontWeight:700,color:passado?"#64748b":"#f59e0b"}}>{fE(q.iva)}</p>
-                        {!passado&&<p style={{fontSize:9,color:"#64748b",marginTop:2}}>{Math.ceil((new Date(q.data)-hoje)/(1000*60*60*24))}d</p>}
+                        <p style={{fontSize:16,fontWeight:700,color:passado?th.textLow:"#f59e0b"}}>{fE(q.iva)}</p>
+                        {!passado&&<p style={{fontSize:9,color:th.textLow,marginTop:2}}>{Math.ceil((new Date(q.data)-hoje)/(1000*60*60*24))}d</p>}
                       </div>
                     );
                   })}
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",padding:"8px 10px",background:"rgba(245,158,11,0.08)",borderRadius:8}}>
-                  <span style={{fontSize:12,color:"#94a3b8"}}>Total IVA anual estimado</span>
+                  <span style={{fontSize:12,color:th.textMid}}>Total IVA anual estimado</span>
                   <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{fE(ivaAnual)}</span>
                 </div>
               </Card>
 
               {/* Próximas obrigações (todas) */}
               <Card>
-                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📆 Calendário Fiscal {fAno}</p>
+                <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:12}}>📆 Calendário Fiscal {fAno}</p>
                 {EMP_OBRIGACOES.sort((a,b)=>new Date(a.data)-new Date(b.data)).map(o=>{
                   const d=new Date(o.data);
                   const passado=d<hoje;
                   const diasR=Math.ceil((d-hoje)/(1000*60*60*24));
-                  const cor=passado?"#64748b":diasR<=30?"#ef4444":diasR<=60?"#f59e0b":"#22c55e";
-                  const tipoColor=o.tipo==="iva"?"#f59e0b":o.tipo==="irc"?"#3b82f6":"#94a3b8";
+                  const cor=passado?th.textLow:diasR<=30?"#ef4444":diasR<=60?"#f59e0b":"#22c55e";
+                  const tipoColor=o.tipo==="iva"?"#f59e0b":o.tipo==="irc"?"#3b82f6":th.textMid;
                   return(
                     <div key={o.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #0d1a2e",opacity:passado?0.45:1}}>
                       <div style={{width:36,height:36,borderRadius:8,background:tipoColor+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -1754,10 +1759,10 @@ export default function App(){
                       </div>
                       <div style={{flex:1}}>
                         <p style={{fontSize:12,fontWeight:500}}>{o.label}</p>
-                        <p style={{fontSize:10,color:"#64748b"}}>{o.data}</p>
+                        <p style={{fontSize:10,color:th.textLow}}>{o.data}</p>
                       </div>
                       <div style={{textAlign:"right"}}>
-                        {o.valor_est&&<p style={{fontSize:12,fontWeight:600,color:"#fff"}}>{fE(o.valor_est)}</p>}
+                        {o.valor_est&&<p style={{fontSize:12,fontWeight:600,color:th.text}}>{fE(o.valor_est)}</p>}
                         <p style={{fontSize:11,fontWeight:600,color:cor}}>{passado?"✓":diasR+"d"}</p>
                       </div>
                     </div>
@@ -1767,20 +1772,20 @@ export default function App(){
 
               {/* Tabela anual */}
               <Card>
-                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📊 Detalhe Anual — {fAno}</p>
+                <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:12}}>📊 Detalhe Anual — {fAno}</p>
                 <div style={{overflowX:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:600}}>
                     <thead>
-                      <tr style={{background:"#0a1220"}}>
+                      <tr style={{background:th.bgAlt}}>
                         {["Mês","Dias","s/IVA","c/IVA","IVA","Despesas","Resultado"].map(h=>(
-                          <th key={h} style={{padding:"6px 8px",textAlign:h==="Mês"||h==="Dias"?"left":"right",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                          <th key={h} style={{padding:"6px 8px",textAlign:h==="Mês"||h==="Dias"?"left":"right",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {anoOverview.map(m=>(
                         <tr key={m.mes} className="hrow" style={{borderBottom:"1px solid #0a1220",background:m.mes===fMes?"rgba(59,130,246,0.06)":"transparent"}}>
-                          <td style={{padding:"7px 8px",fontWeight:m.mes===fMes?700:400,color:m.mes===fMes?"#3b82f6":"#e2e8f0"}}>
+                          <td style={{padding:"7px 8px",fontWeight:m.mes===fMes?700:400,color:m.mes===fMes?"#3b82f6":th.text}}>
                             {MESES[m.mes]}{EMP_MESES_SUBSIDIO.includes(m.mes)&&<span style={{fontSize:9,color:"#f59e0b",marginLeft:4}}>+sub</span>}
                           </td>
                           <td style={{padding:"4px 6px"}}>
@@ -1795,8 +1800,8 @@ export default function App(){
                           <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,color:m.res>=0?"#22c55e":"#ef4444"}}>{fE(m.res)}</td>
                         </tr>
                       ))}
-                      <tr style={{background:"rgba(255,255,255,0.04)",borderTop:"2px solid #1e3048",fontWeight:700}}>
-                        <td style={{padding:"8px",color:"#fff"}} colSpan={2}>TOTAL</td>
+                      <tr style={{background:darkMode?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",borderTop:`2px solid ${th.border}`,fontWeight:700}}>
+                        <td style={{padding:"8px",color:th.text}} colSpan={2}>TOTAL</td>
                         <td style={{padding:"8px",textAlign:"right",color:"#22c55e"}}>{fE(totalRec)}</td>
                         <td style={{padding:"8px",textAlign:"right",color:"#3b82f6"}}>{fE(totalRec*1.23)}</td>
                         <td style={{padding:"8px",textAlign:"right",color:"#f59e0b"}}>{fE(ivaAnual)}</td>
@@ -1869,21 +1874,21 @@ export default function App(){
               // Dates
               const datas={1:{ini:"Abr 2026",fim:"Nov 2026"},2:{ini:"Jan 2027",fim:"Fev 2028"},3:{ini:"Mar 2028",fim:"Out 2028"},4:{ini:"Nov 2028",fim:"IF"}};
               return(
-                <div key={lv.id} style={{background:"#0d1a2e",border:`1px solid ${isA?lv.color+"55":"#1e3048"}`,borderRadius:14,padding:14,opacity:isA?1:0.5}}>
+                <div key={lv.id} style={{background:th.bgCard,border:`1px solid ${isA?lv.color+"55":th.border}`,borderRadius:14,padding:14,opacity:isA?1:0.5}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div style={{width:24,height:24,borderRadius:6,background:lv.color+"22",display:"flex",alignItems:"center",justifyContent:"center"}}>
                       <span style={{fontSize:10,fontWeight:700,color:lv.color}}>{lv.id}</span>
                     </div>
                     {isA&&<Chip label="ATIVO" color={lv.color} sm/>}
                   </div>
-                  <p style={{fontSize:12,fontWeight:600,color:isA?lv.color:"#94a3b8",marginBottom:2}}>{lv.name}</p>
-                  <p style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:4}}>{fE(lv.target)}</p>
-                  <div style={{fontSize:9,color:"#64748b",marginBottom:6}}>📅 {datas[lv.id].ini} → {datas[lv.id].fim}</div>
+                  <p style={{fontSize:12,fontWeight:600,color:isA?lv.color:th.textMid,marginBottom:2}}>{lv.name}</p>
+                  <p style={{fontSize:11,fontWeight:700,color:th.text,marginBottom:4}}>{fE(lv.target)}</p>
+                  <div style={{fontSize:9,color:th.textLow,marginBottom:6}}>📅 {datas[lv.id].ini} → {datas[lv.id].fim}</div>
                   {isA&&<>
                     <PBar val={appSaldo+caSaldo} max={L1_TOTAL} color={lv.color} h={6}/>
                     <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
-                      <span style={{fontSize:9,color:"#64748b"}}>{progressL1.toFixed(1)}%</span>
-                      <span style={{fontSize:9,color:"#64748b"}}>≈{monthsLeft}m</span>
+                      <span style={{fontSize:9,color:th.textLow}}>{progressL1.toFixed(1)}%</span>
+                      <span style={{fontSize:9,color:th.textLow}}>≈{monthsLeft}m</span>
                     </div>
                   </>}
                 </div>
@@ -1894,7 +1899,7 @@ export default function App(){
           {/* Nível 1 detalhe — 2 sub-barras */}
           <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Nível 1 — Fundo de Emergência</p>
+              <p style={{fontSize:14,fontWeight:600,color:th.text}}>Nível 1 — Fundo de Emergência</p>
               <span style={{fontSize:12,color:"#22c55e",fontWeight:600}}>{fE(appSaldo+caSaldo)} / {fE(L1_TOTAL)}</span>
             </div>
             {/* Sub-barra Apparte */}
@@ -1902,42 +1907,42 @@ export default function App(){
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span style={{fontSize:13}}>🏺</span>
-                  <span style={{fontSize:12,color:"#e2e8f0"}}>Apparte Mealheiro</span>
+                  <span style={{fontSize:12,color:th.text}}>Apparte Mealheiro</span>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
                   <span style={{fontSize:12,fontWeight:600,color:"#22c55e"}}>{fE(appSaldo)}</span>
-                  <span style={{fontSize:11,color:"#64748b"}}>/ {fE(L1_APPARTE)}</span>
+                  <span style={{fontSize:11,color:th.textLow}}>/ {fE(L1_APPARTE)}</span>
                   <span style={{fontSize:11,color:"#22c55e"}}>{progressApparte.toFixed(0)}%</span>
                 </div>
               </div>
               <PBar val={appSaldo} max={L1_APPARTE} color="#22c55e" h={8}/>
-              <p style={{fontSize:10,color:"#64748b",marginTop:3}}>Acesso imediato · Buffer de emergência</p>
+              <p style={{fontSize:10,color:th.textLow,marginTop:3}}>Acesso imediato · Buffer de emergência</p>
             </div>
             {/* Sub-barra CA */}
             <div style={{marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span style={{fontSize:13}}>🏦</span>
-                  <span style={{fontSize:12,color:"#e2e8f0"}}>Certificados de Aforro</span>
+                  <span style={{fontSize:12,color:th.text}}>Certificados de Aforro</span>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
                   <span style={{fontSize:12,fontWeight:600,color:"#3b82f6"}}>{fE(caSaldo)}</span>
-                  <span style={{fontSize:11,color:"#64748b"}}>/ {fE(L1_CA)}</span>
+                  <span style={{fontSize:11,color:th.textLow}}>/ {fE(L1_CA)}</span>
                   <span style={{fontSize:11,color:"#3b82f6"}}>{progressCA.toFixed(0)}%</span>
                 </div>
               </div>
               <PBar val={caSaldo} max={L1_CA} color="#3b82f6" h={8}/>
-              <p style={{fontSize:10,color:"#64748b",marginTop:3}}>Resgate após 3 meses · Taxa ~2,1% · Garantia Estado</p>
+              <p style={{fontSize:10,color:th.textLow,marginTop:3}}>Resgate após 3 meses · Taxa ~2,1% · Garantia Estado</p>
             </div>
             {/* Barra total */}
             <div style={{padding:"10px 12px",background:"rgba(34,197,94,0.06)",borderRadius:10,marginTop:4}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                 <span style={{fontSize:12,fontWeight:600,color:"#22c55e"}}>Total Nível 1</span>
-                <span style={{fontSize:12,color:"#64748b"}}>{progressL1.toFixed(1)}% · ≈ {monthsLeft} meses restantes</span>
+                <span style={{fontSize:12,color:th.textLow}}>{progressL1.toFixed(1)}% · ≈ {monthsLeft} meses restantes</span>
               </div>
               <PBar val={appSaldo+caSaldo} max={L1_TOTAL} color="#22c55e" h={10}/>
               <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
-                <span style={{fontSize:11,color:"#64748b"}}>📅 Início: Abr 2026</span>
+                <span style={{fontSize:11,color:th.textLow}}>📅 Início: Abr 2026</span>
                 <span style={{fontSize:11,color:"#f59e0b"}}>🎯 Previsto: {(()=>{const d=new Date(2026,3,1);d.setMonth(d.getMonth()+monthsLeft);return MESES[d.getMonth()]+" "+d.getFullYear();})()}</span>
               </div>
             </div>
@@ -1945,18 +1950,18 @@ export default function App(){
 
           {/* Histórico Nível 1 */}
           <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:4}}>Histórico — Nível 1</p>
-            <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Total acumulado: Apparte + Certificados de Aforro</p>
+            <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:4}}>Histórico — Nível 1</p>
+            <p style={{fontSize:11,color:th.textLow,marginBottom:12}}>Total acumulado: Apparte + Certificados de Aforro</p>
             {snaps.map((s,i)=>{const dev=s.actual-s.planned;return(
               <div key={i} style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 80px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:"1px solid #0d1a2e"}}>
-                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":"#64748b",fontWeight:i===snaps.length-1?700:400}}>{s.label}</span>
+                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":th.textLow,fontWeight:i===snaps.length-1?700:400}}>{s.label}</span>
                 <div>
-                  <p style={{fontSize:10,color:"#64748b",marginBottom:1}}>Plano</p>
-                  <p style={{fontSize:12,color:"#64748b"}}>{fE(s.planned)}</p>
+                  <p style={{fontSize:10,color:th.textLow,marginBottom:1}}>Plano</p>
+                  <p style={{fontSize:12,color:th.textLow}}>{fE(s.planned)}</p>
                 </div>
                 <div>
-                  <p style={{fontSize:10,color:"#64748b",marginBottom:1}}>Real</p>
-                  <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(s.actual)}</p>
+                  <p style={{fontSize:10,color:th.textLow,marginBottom:1}}>Real</p>
+                  <p style={{fontSize:13,fontWeight:600,color:th.text}}>{fE(s.actual)}</p>
                 </div>
                 <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444",fontWeight:600,textAlign:"right"}}>{dev>=0?"+":""}{fE(dev)}</span>
               </div>
@@ -1974,14 +1979,14 @@ export default function App(){
 
           {/* Nível 4 — projecção melhorada */}
           <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:4}}>Nível 4 — Independência Financeira</p>
-            <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Capital actual: {fE(L1_INVEST)} · 100€/mês até Out 2028, depois 1.200€/mês</p>
+            <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:4}}>Nível 4 — Independência Financeira</p>
+            <p style={{fontSize:11,color:th.textLow,marginBottom:12}}>Capital actual: {fE(L1_INVEST)} · 100€/mês até Out 2028, depois 1.200€/mês</p>
 
             {/* Milestones */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
               {[{label:"🌅 Liberdade Financeira",val:500000,color:"#06b6d4"},{label:"🔥 FIRE",val:1050000,color:"#8b5cf6"}].map(m=>(
-                <div key={m.label} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 12px",border:`1px solid ${m.color}33`}}>
-                  <p style={{fontSize:10,color:"#64748b",marginBottom:3}}>{m.label}</p>
+                <div key={m.label} style={{background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,padding:"10px 12px",border:`1px solid ${m.color}33`}}>
+                  <p style={{fontSize:10,color:th.textLow,marginBottom:3}}>{m.label}</p>
                   <p style={{fontSize:16,fontWeight:700,color:m.color}}>{fE(m.val)}</p>
                 </div>
               ))}
@@ -2000,7 +2005,7 @@ export default function App(){
                 for(let i=0;i<years*12-30;i++) cap=cap*(1+r)+1200;
                 return cap;
               };
-              const cenarios=[{taxa:5,color:"#64748b"},{taxa:8,color:"#06b6d4"},{taxa:10,color:"#f59e0b"}];
+              const cenarios=[{taxa:5,color:th.textLow},{taxa:8,color:"#06b6d4"},{taxa:10,color:"#f59e0b"}];
 
               // Chart data — 40 years
               const chartYears=40;
@@ -2035,27 +2040,27 @@ export default function App(){
                     const anosFIRE=Math.round(mFIRE/12);
                     const v10=calcFull(s.taxa,10),v20=calcFull(s.taxa,20),v30=calcFull(s.taxa,30);
                     return(
-                      <div key={s.taxa} style={{background:"#070d1a",borderRadius:10,padding:"12px",border:`1px solid ${s.color}22`}}>
+                      <div key={s.taxa} style={{background:th.bg,borderRadius:10,padding:"12px",border:`1px solid ${s.color}22`}}>
                         <p style={{fontSize:12,fontWeight:700,color:s.color,marginBottom:10}}>Cenário {s.taxa}%</p>
                         <div style={{display:"flex",flexDirection:"column",gap:5}}>
                           <div style={{padding:"6px 8px",background:"rgba(6,182,212,0.08)",borderRadius:6}}>
-                            <p style={{fontSize:9,color:"#64748b",marginBottom:1}}>🌅 Liberdade Financeira</p>
-                            <p style={{fontSize:11,fontWeight:600,color:"#06b6d4"}}>{MESES[dtLF.getMonth()]} {dtLF.getFullYear()} <span style={{color:"#64748b",fontWeight:400}}>· daqui a {anosLF}a</span></p>
+                            <p style={{fontSize:9,color:th.textLow,marginBottom:1}}>🌅 Liberdade Financeira</p>
+                            <p style={{fontSize:11,fontWeight:600,color:"#06b6d4"}}>{MESES[dtLF.getMonth()]} {dtLF.getFullYear()} <span style={{color:th.textLow,fontWeight:400}}>· daqui a {anosLF}a</span></p>
                           </div>
                           <div style={{padding:"6px 8px",background:"rgba(139,92,246,0.08)",borderRadius:6}}>
-                            <p style={{fontSize:9,color:"#64748b",marginBottom:1}}>🔥 FIRE</p>
-                            <p style={{fontSize:11,fontWeight:600,color:"#8b5cf6"}}>{MESES[dtFIRE.getMonth()]} {dtFIRE.getFullYear()} <span style={{color:"#64748b",fontWeight:400}}>· daqui a {anosFIRE}a</span></p>
+                            <p style={{fontSize:9,color:th.textLow,marginBottom:1}}>🔥 FIRE</p>
+                            <p style={{fontSize:11,fontWeight:600,color:"#8b5cf6"}}>{MESES[dtFIRE.getMonth()]} {dtFIRE.getFullYear()} <span style={{color:th.textLow,fontWeight:400}}>· daqui a {anosFIRE}a</span></p>
                           </div>
                           <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
-                            <span style={{fontSize:10,color:"#64748b"}}>10a</span>
-                            <span style={{fontSize:10,color:"#e2e8f0"}}>{v10>=1000000?(v10/1000000).toFixed(2)+"M":(v10/1000).toFixed(0)+"k"}</span>
+                            <span style={{fontSize:10,color:th.textLow}}>10a</span>
+                            <span style={{fontSize:10,color:th.text}}>{v10>=1000000?(v10/1000000).toFixed(2)+"M":(v10/1000).toFixed(0)+"k"}</span>
                           </div>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <span style={{fontSize:10,color:"#64748b"}}>20a</span>
-                            <span style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{v20>=1000000?(v20/1000000).toFixed(2)+"M":(v20/1000).toFixed(0)+"k"}</span>
+                            <span style={{fontSize:10,color:th.textLow}}>20a</span>
+                            <span style={{fontSize:11,fontWeight:600,color:th.text}}>{v20>=1000000?(v20/1000000).toFixed(2)+"M":(v20/1000).toFixed(0)+"k"}</span>
                           </div>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <span style={{fontSize:10,color:"#64748b"}}>30a</span>
+                            <span style={{fontSize:10,color:th.textLow}}>30a</span>
                             <span style={{fontSize:12,fontWeight:700,color:s.color}}>{v30>=1000000?(v30/1000000).toFixed(2)+"M":(v30/1000).toFixed(0)+"k"}</span>
                           </div>
                         </div>
@@ -2066,7 +2071,7 @@ export default function App(){
 
                 {/* Gráfico linhas */}
                 <div style={{marginTop:8}}>
-                  <p style={{fontSize:12,fontWeight:600,color:"#fff",marginBottom:8}}>Projecção de crescimento</p>
+                  <p style={{fontSize:12,fontWeight:600,color:th.text,marginBottom:8}}>Projecção de crescimento</p>
                   {(()=>{
                     // Better Y scale
                     const maxChartVal=Math.max(...chartPts.find(s=>s.taxa===10).pts.map(p=>p.val));
@@ -2081,15 +2086,15 @@ export default function App(){
                         {/* Grid horizontal + Y labels */}
                         {yTicks2.map(v=>(
                           <g key={v}>
-                            <line x1={pad.l} y1={toY2(v)} x2={W-pad.r} y2={toY2(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
-                            <text x={pad.l-5} y={toY2(v)+4} textAnchor="end" fill="#94a3b8" fontSize="10" fontWeight="500">{fmtY2(v)}</text>
+                            <line x1={pad.l} y1={toY2(v)} x2={W-pad.r} y2={toY2(v)} stroke=th.border strokeWidth="1" strokeDasharray="3,3"/>
+                            <text x={pad.l-5} y={toY2(v)+4} textAnchor="end" fill=th.textMid fontSize="10" fontWeight="500">{fmtY2(v)}</text>
                           </g>
                         ))}
                         {/* Grid vertical + X labels */}
                         {xTicks.map(yr=>(
                           <g key={yr}>
-                            <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke="#1e3048" strokeWidth="1" strokeDasharray="2,4"/>
-                            <text x={toX(yr)} y={H-pad.b+13} textAnchor="middle" fill="#94a3b8" fontSize="10">{yr}a</text>
+                            <line x1={toX(yr)} y1={pad.t} x2={toX(yr)} y2={H-pad.b} stroke=th.border strokeWidth="1" strokeDasharray="2,4"/>
+                            <text x={toX(yr)} y={H-pad.b+13} textAnchor="middle" fill=th.textMid fontSize="10">{yr}a</text>
                           </g>
                         ))}
                         {/* LF e FIRE lines */}
@@ -2105,14 +2110,14 @@ export default function App(){
                               <polyline
                                 points={s.pts.map(p=>`${toX(p.yr)},${toY2(p.val)}`).join(" ")}
                                 fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round"/>
-                              <circle cx={toX(lastPt.yr)} cy={toY2(lastPt.val)} r="4" fill={s.color} stroke="#070d1a" strokeWidth="2"/>
+                              <circle cx={toX(lastPt.yr)} cy={toY2(lastPt.val)} r="4" fill={s.color} stroke=th.bg strokeWidth="2"/>
                               <text x={toX(lastPt.yr)-5} y={toY2(lastPt.val)-10} textAnchor="end" fill={s.color} fontSize="10" fontWeight="700">{fmtY2(lastPt.val)}</text>
                             </g>
                           );
                         })}
                         {/* Eixos */}
-                        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
-                        <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke="#1e3048" strokeWidth="1"/>
+                        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H-pad.b} stroke=th.border strokeWidth="1"/>
+                        <line x1={pad.l} y1={H-pad.b} x2={W-pad.r} y2={H-pad.b} stroke=th.border strokeWidth="1"/>
                       </svg>
                     );
                   })()}
@@ -2121,16 +2126,16 @@ export default function App(){
                     {cenarios.map(s=>(
                       <div key={s.taxa} style={{display:"flex",alignItems:"center",gap:4}}>
                         <div style={{width:16,height:2,background:s.color,borderRadius:1}}/>
-                        <span style={{fontSize:10,color:"#64748b"}}>{s.taxa}%</span>
+                        <span style={{fontSize:10,color:th.textLow}}>{s.taxa}%</span>
                       </div>
                     ))}
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
                       <div style={{width:16,height:1,background:"#06b6d4",borderRadius:1,borderTop:"1px dashed #06b6d4"}}/>
-                      <span style={{fontSize:10,color:"#64748b"}}>LF 500k</span>
+                      <span style={{fontSize:10,color:th.textLow}}>LF 500k</span>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
                       <div style={{width:16,height:1,background:"#8b5cf6",borderRadius:1,borderTop:"1px dashed #8b5cf6"}}/>
-                      <span style={{fontSize:10,color:"#64748b"}}>FIRE 1.05M</span>
+                      <span style={{fontSize:10,color:th.textLow}}>FIRE 1.05M</span>
                     </div>
                   </div>
                 </div>
@@ -2140,7 +2145,7 @@ export default function App(){
 
           {/* Sub-tab Simulador */}
           <Card>
-            <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:12}}>🧮 Simulador de Investimento</p>
+            <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:12}}>🧮 Simulador de Investimento</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
               <div><Lbl>Capital inicial (€)</Lbl>
                 <input type="number" value={simCapital} onChange={e=>setSimCapital(parseFloat(e.target.value)||0)} style={{fontSize:14}}/>
@@ -2165,7 +2170,7 @@ export default function App(){
                       <div key={v.anos} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                         <p style={{fontSize:9,color:"#22c55e",fontWeight:600}}>{v.val>=1000000?(v.val/1000000).toFixed(1)+"M":(v.val/1000).toFixed(0)+"k"}</p>
                         <div style={{width:"100%",background:"linear-gradient(to top,#22c55e,#06b6d4)",borderRadius:"4px 4px 0 0",height:`${(v.val/maxV)*90}px`,minHeight:4}}/>
-                        <p style={{fontSize:10,color:"#64748b"}}>{v.anos}a</p>
+                        <p style={{fontSize:10,color:th.textLow}}>{v.anos}a</p>
                       </div>
                     ))}
                   </div>
@@ -2175,10 +2180,10 @@ export default function App(){
                       const inv=simCapital+simMensal*a*12;
                       const ganho=v-inv;
                       return(
-                        <div key={a} style={{background:"#070d1a",borderRadius:8,padding:"8px 10px"}}>
-                          <p style={{fontSize:9,color:"#64748b",marginBottom:3}}>Aos {a} anos</p>
+                        <div key={a} style={{background:th.bg,borderRadius:8,padding:"8px 10px"}}>
+                          <p style={{fontSize:9,color:th.textLow,marginBottom:3}}>Aos {a} anos</p>
                           <p style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{v>=1000000?(v/1000000).toFixed(2)+"M":fE(v)}</p>
-                          <p style={{fontSize:9,color:"#64748b"}}>Investido: {fE(inv)}</p>
+                          <p style={{fontSize:9,color:th.textLow}}>Investido: {fE(inv)}</p>
                           <p style={{fontSize:9,color:"#06b6d4"}}>Ganho: +{ganho>=1000000?(ganho/1000000).toFixed(2)+"M":fE(ganho)}</p>
                         </div>
                       );
@@ -2196,10 +2201,10 @@ export default function App(){
         <div style={{display:planoTab==="patrimonio"?"block":"none"}}>
 
           {/* Sub-tabs */}
-          <div style={{display:"flex",gap:0,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:3,marginBottom:14,width:"fit-content"}}>
+          <div style={{display:"flex",gap:0,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:10,padding:3,marginBottom:14,width:"fit-content"}}>
             {[{id:"geral",label:"📊 Geral"},{id:"investimentos",label:"📈 Investimentos"},{id:"registar",label:"✏️ Registar"}].map(t=>(
               <button key={t.id} onClick={()=>setPatSubTab(t.id)}
-                style={{padding:"6px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:patSubTab===t.id?"rgba(168,85,247,0.3)":"none",color:patSubTab===t.id?"#fff":"#64748b",border:"none",cursor:"pointer"}}>
+                style={{padding:"6px 14px",fontSize:12,fontWeight:500,borderRadius:8,background:patSubTab===t.id?"rgba(168,85,247,0.3)":"none",color:patSubTab===t.id?th.text:th.textLow,border:"none",cursor:"pointer"}}>
                 {t.label}
               </button>
             ))}
@@ -2210,7 +2215,7 @@ export default function App(){
           {patSubTab==="geral"&&(()=>{
             const latest=patSnaps[patSnaps.length-1];
             const prev=patSnaps[patSnaps.length-2];
-            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Vai a ✏️ Registar para começar.</p></Card>;
+            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow}}>Ainda sem dados. Vai a ✏️ Registar para começar.</p></Card>;
             const tA=Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
             const tP=Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
             const pat=tA-tP;
@@ -2234,7 +2239,7 @@ export default function App(){
             return(<>
               {/* KPIs */}
               <div style={{marginBottom:14}}>
-                <p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{latest.mes} · último registo</p>
+                <p style={{fontSize:12,color:th.textLow,marginBottom:10}}>{latest.mes} · último registo</p>
                 <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:14}}>
                   {[
                     {label:"Total Ativos",val:tA,color:"#22c55e"},
@@ -2242,11 +2247,11 @@ export default function App(){
                     {label:"Património Líquido",val:pat,color:"#a855f7"},
                     {label:"Variação mensal",val:diff,color:diff===null?null:diff>=0?"#22c55e":"#ef4444",pct,isVar:true},
                   ].map(k=>(
-                    <div key={k.label} style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:"14px"}}>
-                      <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
+                    <div key={k.label} style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:14,padding:"14px"}}>
+                      <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
                       {k.val!==null&&k.val!==undefined
-                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||"#fff"}}>{k.isVar&&k.val>=0?"+":""}{fE(k.val)}</p>
-                        :<p style={{fontSize:14,color:"#64748b"}}>—</p>}
+                        ?<p style={{fontSize:18,fontWeight:700,color:k.color||th.text}}>{k.isVar&&k.val>=0?"+":""}{fE(k.val)}</p>
+                        :<p style={{fontSize:14,color:th.textLow}}>—</p>}
                       {k.isVar&&k.pct!==null&&k.pct!==undefined&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
                     </div>
                   ))}
@@ -2256,7 +2261,7 @@ export default function App(){
               {/* Line chart 12 meses */}
               {hasLine&&(
                 <Card>
-                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução do Património Líquido — {patAno}</p>
+                  <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>Evolução do Património Líquido — {patAno}</p>
                   {(()=>{
                     const PL=50,PR=10,PT=20,PB=30,W2=600,H2=160;
                     const innerW=W2-PL-PR,innerH=H2-PT-PB;
@@ -2281,13 +2286,13 @@ export default function App(){
                           {/* Y grid + labels */}
                           {yTicks2.map((v,i)=>(
                             <g key={i}>
-                              <line x1={PL} y1={toY2(v)} x2={W2-PR} y2={toY2(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
-                              <text x={PL-4} y={toY2(v)+4} textAnchor="end" fill="#64748b" fontSize="9">{fmtV(v)}</text>
+                              <line x1={PL} y1={toY2(v)} x2={W2-PR} y2={toY2(v)} stroke=th.border strokeWidth="1" strokeDasharray="3,3"/>
+                              <text x={PL-4} y={toY2(v)+4} textAnchor="end" fill=th.textLow fontSize="9">{fmtV(v)}</text>
                             </g>
                           ))}
                           {/* Eixos */}
-                          <line x1={PL} y1={PT} x2={PL} y2={H2-PB} stroke="#1e3048" strokeWidth="1"/>
-                          <line x1={PL} y1={H2-PB} x2={W2-PR} y2={H2-PB} stroke="#1e3048" strokeWidth="1"/>
+                          <line x1={PL} y1={PT} x2={PL} y2={H2-PB} stroke=th.border strokeWidth="1"/>
+                          <line x1={PL} y1={H2-PB} x2={W2-PR} y2={H2-PB} stroke=th.border strokeWidth="1"/>
                           {/* Lines */}
                           {segs2.map((seg,si)=>(
                             <polyline key={si} points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
@@ -2298,9 +2303,9 @@ export default function App(){
                             if(p.y===null) return null;
                             return(
                               <g key={i}>
-                                <circle cx={p.x} cy={p.y} r="5" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                                <circle cx={p.x} cy={p.y} r="5" fill="#a855f7" stroke=th.bgCard strokeWidth="2"/>
                                 <text x={p.x} y={p.y-10} textAnchor="middle" fill="#a855f7" fontSize="9" fontWeight="600">{fmtV(p.val)}</text>
-                                <text x={p.x} y={H2-PB+14} textAnchor="middle" fill="#64748b" fontSize="9">{p.mes}</text>
+                                <text x={p.x} y={H2-PB+14} textAnchor="middle" fill=th.textLow fontSize="9">{p.mes}</text>
                               </g>
                             );
                           })}
@@ -2314,13 +2319,13 @@ export default function App(){
               {/* Tabela Excel com meses */}
               {patSnaps.length>1&&(
                 <Card>
-                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Histórico</p>
+                  <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>Histórico</p>
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:480}}>
                       <thead>
-                        <tr style={{borderBottom:"1px solid #1e3048"}}>
+                        <tr style={{borderBottom:"1px solid ${${th.border}}"}}>
                           {["Mês","Ativos","Passivos","Pat. Líquido","Variação","Var %"].map(h=>(
-                            <th key={h} style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{h}</th>
+                            <th key={h} style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1}}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -2339,8 +2344,8 @@ export default function App(){
                               <td style={{padding:"9px 8px",color:"#22c55e"}}>{fE(tA)}</td>
                               <td style={{padding:"9px 8px",color:"#ef4444"}}>{fE(tP)}</td>
                               <td style={{padding:"9px 8px",fontWeight:700,color:"#a855f7"}}>{fE(pat)}</td>
-                              <td style={{padding:"9px 8px",color:diff===null?"#64748b":diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
-                              <td style={{padding:"9px 8px",color:pct===null?"#64748b":pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
+                              <td style={{padding:"9px 8px",color:diff===null?th.textLow:diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
+                              <td style={{padding:"9px 8px",color:pct===null?th.textLow:pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
                             </tr>
                           );
                         })}
@@ -2354,7 +2359,7 @@ export default function App(){
 
           {/* ── SUB-TAB INVESTIMENTOS ── */}
           {patSubTab==="investimentos"&&(()=>{
-            if(!patSnaps.length) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b"}}>Ainda sem dados. Vai a ✏️ Registar para começar.</p></Card>;
+            if(!patSnaps.length) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow}}>Ainda sem dados. Vai a ✏️ Registar para começar.</p></Card>;
             const latest=patSnaps[patSnaps.length-1];
             const invItems=PATRIMONIO_ATIVOS.filter(a=>a.grupo==="investimento");
             return(<>
@@ -2375,15 +2380,15 @@ export default function App(){
                   const ganhoTotal=investido>0?valorReal-investido:null;
                   const pctTotal=investido>0&&ganhoTotal!=null?ganhoTotal/investido*100:null;
                   return(
-                    <div key={item.id} style={{background:"#0d1a2e",border:`1px solid ${ganhoTotal>=0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:14,padding:14,cursor:"pointer",outline:invSelected===item.id?"2px solid #a855f7":"none"}}
+                    <div key={item.id} style={{background:th.bgCard,border:`1px solid ${ganhoTotal>=0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:14,padding:14,cursor:"pointer",outline:invSelected===item.id?"2px solid #a855f7":"none"}}
                       onClick={()=>setInvSelected(item.id)}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                         <span style={{fontSize:20}}>{item.icon}</span>
-                        <p style={{fontSize:12,fontWeight:600,color:"#e2e8f0"}}>{item.label}</p>
+                        <p style={{fontSize:12,fontWeight:600,color:th.text}}>{item.label}</p>
                       </div>
-                      <p style={{fontSize:20,fontWeight:700,color:"#fff",marginBottom:4}}>{fE(valorReal)}</p>
+                      <p style={{fontSize:20,fontWeight:700,color:th.text,marginBottom:4}}>{fE(valorReal)}</p>
                       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                        {d.investido&&<span style={{fontSize:10,color:"#64748b"}}>invest. {fE(d.investido)}</span>}
+                        {d.investido&&<span style={{fontSize:10,color:th.textLow}}>invest. {fE(d.investido)}</span>}
                         {ganhoTotal!==null&&<span style={{fontSize:11,fontWeight:600,color:ganhoTotal>=0?"#22c55e":"#ef4444"}}>{ganhoTotal>=0?"↑":"↓"}{fE(Math.abs(ganhoTotal))}{pctTotal!==null?` (${pctTotal>=0?"+":""}${pctTotal.toFixed(1)}%)`:""}</span>}
                       </div>
                       {ganhoMes!==null&&<p style={{fontSize:11,marginTop:4,color:ganhoMes>=0?"#22c55e":"#ef4444"}}>Mês: {ganhoMes>=0?"+":""}{fE(ganhoMes)}</p>}
@@ -2426,7 +2431,7 @@ export default function App(){
                 return(
                   <Card>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                      <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>{item.icon} {item.label} — Histórico + Projecção</p>
+                      <p style={{fontSize:14,fontWeight:600,color:th.text}}>{item.icon} {item.label} — Histórico + Projecção</p>
                       <select value={invSelected} onChange={e=>setInvSelected(e.target.value)} style={{fontSize:11,padding:"4px 8px"}}>
                         {invItems.filter(a=>patSnaps.some(s=>s.ativos?.[a.id]?.valor)).map(a=>(
                           <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
@@ -2446,22 +2451,22 @@ export default function App(){
                           {/* Y grid + labels */}
                           {yTicksI.map((v,i)=>(
                             <g key={i}>
-                              <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke="#1e3048" strokeWidth="1" strokeDasharray="3,3"/>
-                              <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill="#64748b" fontSize="9">{fmtI(v)}</text>
+                              <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke=th.border strokeWidth="1" strokeDasharray="3,3"/>
+                              <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill=th.textLow fontSize="9">{fmtI(v)}</text>
                             </g>
                           ))}
                           {/* X labels */}
                           {xTicksI.map(yr=>(
                             <g key={yr}>
-                              <line x1={toIX(yr,projYears+1)} y1={IPT} x2={toIX(yr,projYears+1)} y2={IH-IPB} stroke="#1e3048" strokeWidth="1" strokeDasharray="2,4" opacity="0.5"/>
-                              <text x={toIX(yr,projYears+1)} y={IH-IPB+14} textAnchor="middle" fill="#64748b" fontSize="9">{yr}a</text>
+                              <line x1={toIX(yr,projYears+1)} y1={IPT} x2={toIX(yr,projYears+1)} y2={IH-IPB} stroke=th.border strokeWidth="1" strokeDasharray="2,4" opacity="0.5"/>
+                              <text x={toIX(yr,projYears+1)} y={IH-IPB+14} textAnchor="middle" fill=th.textLow fontSize="9">{yr}a</text>
                             </g>
                           ))}
                           {/* Eixos */}
-                          <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke="#1e3048" strokeWidth="1"/>
-                          <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke="#1e3048" strokeWidth="1"/>
+                          <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke=th.border strokeWidth="1"/>
+                          <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke=th.border strokeWidth="1"/>
                           {/* Proj lines */}
-                          {[{pts:p5,color:"#64748b"},{pts:p8,color:"#06b6d4"},{pts:p10,color:"#f59e0b"}].map(({pts,color})=>(
+                          {[{pts:p5,color:th.textLow},{pts:p8,color:"#06b6d4"},{pts:p10,color:"#f59e0b"}].map(({pts,color})=>(
                             <polyline key={color}
                               points={pts.map((p,i)=>`${toIX(i,pts.length)},${toIY(p.val)}`).join(" ")}
                               fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.8"/>
@@ -2483,7 +2488,7 @@ export default function App(){
                               <polyline points={pts.map(p=>`${p.x},${p.y}`).join(" ")}
                                 fill="none" stroke="#a855f7" strokeWidth="2.5"/>
                               {pts.map((p,i)=>(
-                                <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" stroke="#0d1a2e" strokeWidth="2"/>
+                                <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" stroke=th.bgCard strokeWidth="2"/>
                               ))}
                             </>);
                           })()}
@@ -2491,10 +2496,10 @@ export default function App(){
                       );
                     })()}
                     <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
-                      {[{color:"#a855f7",label:"Real"},{color:"#64748b",label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true}].map(l=>(
+                      {[{color:"#a855f7",label:"Real"},{color:th.textLow,label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true}].map(l=>(
                         <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
                           <div style={{width:16,height:2,background:l.color,borderRadius:1,opacity:l.dash?0.7:1,borderTop:l.dash?"2px dashed "+l.color:"none"}}/>
-                          <span style={{fontSize:10,color:"#64748b"}}>{l.label}</span>
+                          <span style={{fontSize:10,color:th.textLow}}>{l.label}</span>
                         </div>
                       ))}
                     </div>
@@ -2510,7 +2515,7 @@ export default function App(){
           {/* Register month form — Excel style */}
           <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-              <p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Registar mês</p>
+              <p style={{fontSize:14,fontWeight:600,color:th.text}}>Registar mês</p>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
                   onChange={e=>{
@@ -2537,11 +2542,11 @@ export default function App(){
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead>
-                  <tr style={{background:"rgba(255,255,255,0.03)"}}>
-                    <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"45%"}}>Rubrica</th>
-                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"25%"}}>Valor atual (€)</th>
-                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"20%"}}>Investido (€)</th>
-                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #1e3048",width:"10%"}}>+/-</th>
+                  <tr style={{background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)"}}>
+                    <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid ${${th.border}}",width:"45%"}}>Rubrica</th>
+                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"25%"}}>Valor atual (€)</th>
+                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"20%"}}>Investido (€)</th>
+                    <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"10%"}}>+/-</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2549,7 +2554,7 @@ export default function App(){
                   {GRUPOS_ATIVOS.map(grupo=>(
                     <>
                       <tr key={"h_"+grupo.id}>
-                        <td colSpan={4} style={{padding:"10px 12px 4px",fontSize:11,fontWeight:700,color:grupo.color,textTransform:"uppercase",letterSpacing:1,background:"rgba(255,255,255,0.02)",borderTop:"1px solid #1e3048"}}>
+                        <td colSpan={4} style={{padding:"10px 12px 4px",fontSize:11,fontWeight:700,color:grupo.color,textTransform:"uppercase",letterSpacing:1,background:darkMode?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.02)",borderTop:`1px solid ${th.border}`}}>
                           {grupo.icon} {grupo.label}
                         </td>
                       </tr>
@@ -2562,13 +2567,13 @@ export default function App(){
                             <td style={{padding:"6px 12px"}}>
                               <div style={{display:"flex",alignItems:"center",gap:8}}>
                                 <span style={{fontSize:14}}>{item.icon}</span>
-                                <span style={{color:"#e2e8f0"}}>{item.label}</span>
+                                <span style={{color:th.text}}>{item.label}</span>
                               </div>
                             </td>
                             <td style={{padding:"4px 8px",textAlign:"right"}}>
                               <input type="number" value={d.valor} placeholder="—"
                                 onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:parseFloat(e.target.value)||""}}}))}
-                                style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
+                                style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:darkMode?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",border:`1px solid ${th.border}`,borderRadius:6,width:"100%",color:th.text}}/>
                             </td>
                             <td style={{padding:"4px 8px",textAlign:"right"}}>
                               {!item.fixo?(()=>{
@@ -2578,25 +2583,25 @@ export default function App(){
                                   <div style={{position:"relative"}}>
                                     <input type="number" value={d.investido} placeholder="—"
                                       onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
-                                      style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#fff"}}/>
+                                      style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:darkMode?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",border:`1px solid ${th.border}`,borderRadius:6,width:"100%",color:th.text}}/>
                                     {contaAuto&&<button onClick={()=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:contaAuto.saldo}}}))}
                                       style={{position:"absolute",right:-28,top:2,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"none",borderRadius:4,padding:"2px 5px",fontSize:9,cursor:"pointer"}} title={`Preencher Investido: ${contaAuto.nome} (${contaAuto.saldo.toFixed(2)}€)`}>↑</button>}
                                   </div>
                                 );
-                              })():<span style={{color:"#64748b",fontSize:12}}>—</span>}
+                              })():<span style={{color:th.textLow,fontSize:12}}>—</span>}
                             </td>
                             <td style={{padding:"6px 8px",textAlign:"right"}}>
                               {ganho!==null?(
                                 <span style={{fontSize:11,fontWeight:600,color:ganho>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>
                                   {ganho>=0?"↑":"↓"}{pct!==null?`${Math.abs(pct).toFixed(1)}%`:""}
                                 </span>
-                              ):<span style={{color:"#64748b"}}>—</span>}
+                              ):<span style={{color:th.textLow}}>—</span>}
                             </td>
                           </tr>
                         );
                       })}
                       <tr key={"t_"+grupo.id} style={{background:"rgba(34,197,94,0.04)"}}>
-                        <td style={{padding:"6px 12px",fontSize:12,color:"#64748b",fontStyle:"italic"}}>Total {grupo.label}</td>
+                        <td style={{padding:"6px 12px",fontSize:12,color:th.textLow,fontStyle:"italic"}}>Total {grupo.label}</td>
                         <td style={{padding:"6px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:"#22c55e"}}>
                           {fE(PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).reduce((s,item)=>{
                             const v=patDraft.ativos?.[item.id]?.valor||0;
@@ -2609,7 +2614,7 @@ export default function App(){
                   ))}
                   {/* PASSIVOS */}
                   <tr>
-                    <td colSpan={4} style={{padding:"10px 12px 4px",fontSize:11,fontWeight:700,color:"#ef4444",textTransform:"uppercase",letterSpacing:1,background:"rgba(239,68,68,0.04)",borderTop:"2px solid #1e3048"}}>
+                    <td colSpan={4} style={{padding:"10px 12px 4px",fontSize:11,fontWeight:700,color:"#ef4444",textTransform:"uppercase",letterSpacing:1,background:"rgba(239,68,68,0.04)",borderTop:`2px solid ${th.border}`}}>
                       🔴 Passivos
                     </td>
                   </tr>
@@ -2620,20 +2625,20 @@ export default function App(){
                         <td style={{padding:"6px 12px"}}>
                           <div style={{display:"flex",alignItems:"center",gap:8}}>
                             <span style={{fontSize:14}}>{item.icon}</span>
-                            <span style={{color:"#e2e8f0"}}>{item.label}</span>
+                            <span style={{color:th.text}}>{item.label}</span>
                           </div>
                         </td>
                         <td style={{padding:"4px 8px",textAlign:"right"}}>
                           <input type="number" value={val} placeholder="—"
                             onChange={e=>setPatDraft(p=>({...p,passivos:{...p.passivos,[item.id]:parseFloat(e.target.value)||""}}))}
-                            style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid #1e3048",borderRadius:6,width:"100%",color:"#ef4444"}}/>
+                            style={{textAlign:"right",fontSize:13,padding:"4px 8px",background:darkMode?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)",border:`1px solid ${th.border}`,borderRadius:6,width:"100%",color:"#ef4444"}}/>
                         </td>
                         <td colSpan={2}/>
                       </tr>
                     );
                   })}
                   <tr style={{background:"rgba(239,68,68,0.04)"}}>
-                    <td style={{padding:"6px 12px",fontSize:12,color:"#64748b",fontStyle:"italic"}}>Total Passivos</td>
+                    <td style={{padding:"6px 12px",fontSize:12,color:th.textLow,fontStyle:"italic"}}>Total Passivos</td>
                     <td style={{padding:"6px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:"#ef4444"}}>
                       {fE(PATRIMONIO_PASSIVOS.reduce((s,item)=>{const v=patDraft.passivos?.[item.id]||0;return s+(typeof v==="number"?v:parseFloat(v)||0);},0))}
                     </td>
@@ -2660,7 +2665,7 @@ export default function App(){
               const snap={mes,ativos:patDraft.ativos,passivos:patDraft.passivos};
               setPatSnaps(prev=>{const filtered=prev.filter(s=>s.mes!==mes);return[...filtered,snap].sort((a,b)=>a.mes.localeCompare(b.mes));});
               setPatDraft({ativos:{},passivos:{}});
-            }} style={{width:"100%",background:"#a855f7",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,marginTop:16,cursor:"pointer"}}>
+            }} style={{width:"100%",background:"#a855f7",color:th.text,border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,marginTop:16,cursor:"pointer"}}>
               ✓ Guardar {patEdit||new Date().toISOString().slice(0,7)}
             </button>
           </Card>
@@ -2690,7 +2695,7 @@ export default function App(){
         {/* Desktop sidebar */}
         {!isMobile&&(
           <div style={{width:210,background:th.bgAlt,borderRight:`1px solid ${th.border}`,display:"flex",flexDirection:"column",padding:"16px 0",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto"}}>
-            <div style={{padding:"0 16px 14px",borderBottom:"1px solid #1e3048",marginBottom:10}}>
+            <div style={{padding:"0 16px 14px",borderBottom:"1px solid ${${th.border}}",marginBottom:10}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                 <button onClick={()=>setScreen("landing")} style={{background:"none",color:th.textLow,padding:"3px 0",border:"none",fontSize:11,cursor:"pointer"}}>← Hub</button>
                 <ThemeToggle/>
@@ -2702,8 +2707,8 @@ export default function App(){
                   onFocus={()=>setShowGlobalSearch(true)}
                   style={{fontSize:11,padding:"6px 10px",width:"100%"}}/>
                 {showGlobalSearch&&globalSearch.length>=2&&(
-                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:10,zIndex:100,maxHeight:300,overflowY:"auto",marginTop:4}}>
-                    {globalResults.length===0?<p style={{padding:"10px 12px",fontSize:12,color:"#64748b"}}>Sem resultados</p>:
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:10,zIndex:100,maxHeight:300,overflowY:"auto",marginTop:4}}>
+                    {globalResults.length===0?<p style={{padding:"10px 12px",fontSize:12,color:th.textLow}}>Sem resultados</p>:
                     globalResults.map(t=>(
                       <div key={t.id} style={{padding:"8px 12px",borderBottom:"1px solid #0a1220",cursor:"pointer"}} className="hrow"
                         onClick={()=>{
@@ -2713,38 +2718,38 @@ export default function App(){
                           setGlobalSearch("");setShowGlobalSearch(false);
                         }}>
                         <div style={{display:"flex",justifyContent:"space-between"}}>
-                          <p style={{fontSize:12,fontWeight:500,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"65%"}}>{t.ent||t.desc}</p>
-                          <p style={{fontSize:12,fontWeight:600,color:t.tipo==="c"?"#22c55e":"#e2e8f0"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
+                          <p style={{fontSize:12,fontWeight:500,color:th.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"65%"}}>{t.ent||t.desc}</p>
+                          <p style={{fontSize:12,fontWeight:600,color:t.tipo==="c"?"#22c55e":th.text}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
                         </div>
-                        <p style={{fontSize:10,color:"#64748b"}}>{t.data} · {t.cat}{t.sub?` · ${t.sub}`:""}</p>
+                        <p style={{fontSize:10,color:th.textLow}}>{t.data} · {t.cat}{t.sub?` · ${t.sub}`:""}</p>
                       </div>
                     ))}
-                    <button onClick={()=>{setGlobalSearch("");setShowGlobalSearch(false);}} style={{width:"100%",padding:"6px",background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer"}}>Fechar</button>
+                    <button onClick={()=>{setGlobalSearch("");setShowGlobalSearch(false);}} style={{width:"100%",padding:"6px",background:"none",border:"none",color:th.textLow,fontSize:11,cursor:"pointer"}}>Fechar</button>
                   </div>
                 )}
               </div>
             </div>
-            <div style={{display:"flex",gap:4,padding:"6px 10px 10px",borderBottom:"1px solid #1e3048",marginBottom:6}}>
+            <div style={{display:"flex",gap:4,padding:"6px 10px 10px",borderBottom:"1px solid ${${th.border}}",marginBottom:6}}>
               <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{flex:1,fontSize:12,padding:"5px 6px"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
               <select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{width:62,fontSize:12,padding:"5px 6px"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
             </div>
             {navItems.map(n=>(
               <div key={n.id}>
-                <button onClick={()=>setTab(n.id==="config"?"categorizar":n.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 16px",fontSize:13,fontWeight:(tab===n.id||( n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?600:400,color:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"#fff":"#64748b",background:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"rgba(59,130,246,0.12)":"transparent",borderLeft:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"3px solid #3b82f6":"3px solid transparent",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
+                <button onClick={()=>setTab(n.id==="config"?"categorizar":n.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 16px",fontSize:13,fontWeight:(tab===n.id||( n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?600:400,color:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?th.text:th.textLow,background:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"rgba(59,130,246,0.12)":"transparent",borderLeft:(tab===n.id||(n.id==="config"&&configSubTabs.some(s=>s.id===tab)))?"3px solid #3b82f6":"3px solid transparent",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
                   <span style={{fontFamily:"monospace",fontSize:12}}>{n.icon}</span><span>{n.label}</span>
                   {n.id==="config"&&pend.length>0&&<span style={{marginLeft:"auto",fontSize:10,background:"rgba(239,68,68,0.2)",color:"#ef4444",borderRadius:10,padding:"1px 6px"}}>{pend.length}</span>}
                 </button>
                 {/* Config sub-items */}
                 {n.id==="config"&&configSubTabs.some(s=>s.id===tab)&&configSubTabs.map(s=>(
-                  <button key={s.id} onClick={()=>setTab(s.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 16px 7px 32px",fontSize:12,fontWeight:tab===s.id?600:400,color:tab===s.id?"#3b82f6":"#64748b",background:tab===s.id?"rgba(59,130,246,0.08)":"transparent",borderLeft:"none",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
+                  <button key={s.id} onClick={()=>setTab(s.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 16px 7px 32px",fontSize:12,fontWeight:tab===s.id?600:400,color:tab===s.id?"#3b82f6":th.textLow,background:tab===s.id?"rgba(59,130,246,0.08)":"transparent",borderLeft:"none",border:"none",width:"100%",textAlign:"left",cursor:"pointer"}}>
                     <span style={{fontFamily:"monospace",fontSize:11}}>{s.icon}</span><span>{s.label}</span>
                   </button>
                 ))}
               </div>
             ))}
-            <div style={{marginTop:"auto",padding:"12px 16px",borderTop:"1px solid #1e3048"}}>
-              {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:"#64748b"},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:"#64748b"};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
-              <p style={{fontSize:11,color:"#64748b"}}>Património</p>
+            <div style={{marginTop:"auto",padding:"12px 16px",borderTop:`1px solid ${th.border}`}}>
+              {(()=>{const cfg={idle:{dot:"⚪",label:"A ligar...",color:th.textLow},loading:{dot:"🟡",label:"A carregar...",color:"#f59e0b"},saving:{dot:"🟡",label:"A guardar...",color:"#f59e0b"},synced:{dot:"🟢",label:"Sincronizado",color:"#22c55e"},error:{dot:"🔴",label:"Erro de ligação",color:"#ef4444"}}[driveStatus]||{dot:"⚪",label:"",color:th.textLow};return<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10}}>{cfg.dot}</span><span style={{fontSize:10,color:cfg.color}}>{cfg.label}</span></div>;})()}
+              <p style={{fontSize:11,color:th.textLow}}>Património</p>
               <p style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE(patrimonioTotal)}</p>
             </div>
           </div>
@@ -2771,7 +2776,7 @@ export default function App(){
           {/* DASHBOARD */}
           {tab==="dashboard"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Dashboard</p><p style={{fontSize:12,color:"#64748b",marginBottom:14}}>{MESES[fMes]} {fAno}</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Dashboard</p><p style={{fontSize:12,color:th.textLow,marginBottom:14}}>{MESES[fMes]} {fAno}</p></>}
               {alerts.filter(a=>!dismissedAlerts.has(a.cat)).length>0&&(
                 <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:12,padding:"10px 14px",marginBottom:12}}>
                   <p style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:6}}>⚠️ Alertas de orçamento</p>
@@ -2780,12 +2785,12 @@ export default function App(){
                       <input type="checkbox" onChange={()=>dismissAlert(a.cat)}
                         style={{width:14,height:14,cursor:"pointer",accentColor:"#3b82f6",flexShrink:0}}/>
                       <div style={{flex:1,display:"flex",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setCatModal(a.cat)}>
-                        <span style={{fontSize:12,color:"#94a3b8"}}>{cats[a.cat]?.icon} {a.cat}</span>
+                        <span style={{fontSize:12,color:th.textMid}}>{cats[a.cat]?.icon} {a.cat}</span>
                         <span style={{fontSize:12,color:a.pct>=100?"#ef4444":"#f59e0b",fontWeight:600}}>{a.pct.toFixed(0)}% · {fE(a.net)}/{fE(a.orc)}</span>
                       </div>
                     </div>
                   ))}
-                  <p style={{fontSize:10,color:"#64748b",marginTop:6}}>✓ marca para ignorar este mês</p>
+                  <p style={{fontSize:10,color:th.textLow,marginTop:6}}>✓ marca para ignorar este mês</p>
                 </div>
               )}
               {(()=>{
@@ -2806,10 +2811,10 @@ export default function App(){
                 return(
                   <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)",gap:8,marginBottom:12}}>
                     {kpis.map(k=>(
-                      <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:12,padding:"12px 14px"}}>
-                        <p style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                      <div key={k.label} style={{background:th.bgCard,border:`1px solid ${k.color}33`,borderRadius:12,padding:"12px 14px"}}>
+                        <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
                         <p style={{fontSize:18,fontWeight:600,color:k.color}}>{k.val}</p>
-                        <p style={{fontSize:10,color:"#64748b",marginTop:3}}>{k.sub}</p>
+                        <p style={{fontSize:10,color:th.textLow,marginTop:3}}>{k.sub}</p>
                       </div>
                     ))}
                   </div>
@@ -2818,7 +2823,7 @@ export default function App(){
 
               {/* Contas */}
               <Card>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><p style={{fontSize:14,fontWeight:600,color:"#fff"}}>Contas</p><button onClick={()=>setTab("contas")} style={{background:"none",border:"none",color:"#3b82f6",fontSize:12,cursor:"pointer"}}>Gerir →</button></div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><p style={{fontSize:14,fontWeight:600,color:th.text}}>Contas</p><button onClick={()=>setTab("contas")} style={{background:"none",border:"none",color:"#3b82f6",fontSize:12,cursor:"pointer"}}>Gerir →</button></div>
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
                   {CONTA_SECOES.map(sec=>{
                     const secContas=contas.filter(c=>c.secao===sec.id);
@@ -2828,7 +2833,7 @@ export default function App(){
                       <div key={sec.id}>
                         {/* Section label */}
                         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                          <span style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>{sec.icon} {sec.label}</span>
+                          <span style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1}}>{sec.icon} {sec.label}</span>
                         </div>
                         {/* Total card FIRST, then accounts */}
                         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
@@ -2837,12 +2842,12 @@ export default function App(){
                             <p style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE(secTotal)}</p>
                           </div>
                           {[...secContas].sort((a,b)=>a.nome.localeCompare(b.nome,"pt")).map(c=>(
-                            <div key={c.id} style={{background:"#070d1a",border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95}}>
+                            <div key={c.id} style={{background:th.bg,border:`1px solid ${c.cor}33`,borderRadius:10,padding:"8px 12px",flexShrink:0,minWidth:95}}>
                               <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
                                 <span style={{fontSize:13}}>{c.icon}</span>
-                                <span style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:72}}>{c.nome}</span>
+                                <span style={{fontSize:10,color:th.textLow,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:72}}>{c.nome}</span>
                               </div>
-                              <p style={{fontSize:13,fontWeight:600,color:"#fff"}}>{fE(contaSaldos[c.id]??0)}</p>
+                              <p style={{fontSize:13,fontWeight:600,color:th.text}}>{fE(contaSaldos[c.id]??0)}</p>
                             </div>
                           ))}
                         </div>
@@ -2850,9 +2855,9 @@ export default function App(){
                     );
                   })}
                   {/* Grand total */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:10,marginTop:4}}>
-                    <span style={{fontSize:12,color:"#64748b"}}>✦ Total de contas</span>
-                    <span style={{fontSize:16,fontWeight:700,color:"#fff"}}>{fE(patrimonioTotal)}</span>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,marginTop:4}}>
+                    <span style={{fontSize:12,color:th.textLow}}>✦ Total de contas</span>
+                    <span style={{fontSize:16,fontWeight:700,color:th.text}}>{fE(patrimonioTotal)}</span>
                   </div>
                 </div>
               </Card>
@@ -2860,7 +2865,7 @@ export default function App(){
               {/* Pie chart + legend */}
               {pieData.length>0&&(
                 <Card>
-                  <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Distribuição de despesas</p>
+                  <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>Distribuição de despesas</p>
                   <div style={{display:"flex",flexDirection:isMobile?"column":"row",gap:20,alignItems:"center",justifyContent:"center"}}>
                     <div style={{flexShrink:0}}>
                       <PieChart data={pieData} size={isMobile?150:170}/>
@@ -2871,9 +2876,9 @@ export default function App(){
                         return(
                           <div key={d.cat} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #0d1a2e",cursor:"pointer"}} onClick={()=>setCatModal(d.cat)}>
                             <div style={{width:10,height:10,borderRadius:3,background:d.color,flexShrink:0}}/>
-                            <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#e2e8f0"}}>{cats[d.cat]?.icon} {d.cat}</span>
-                            <span style={{fontSize:11,color:"#64748b",flexShrink:0,width:32,textAlign:"right"}}>{pct}%</span>
-                            <span style={{fontSize:12,fontWeight:600,color:"#fff",flexShrink:0,width:52,textAlign:"right"}}>{fE(d.val)}</span>
+                            <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:th.text}}>{cats[d.cat]?.icon} {d.cat}</span>
+                            <span style={{fontSize:11,color:th.textLow,flexShrink:0,width:32,textAlign:"right"}}>{pct}%</span>
+                            <span style={{fontSize:12,fontWeight:600,color:th.text,flexShrink:0,width:52,textAlign:"right"}}>{fE(d.val)}</span>
                           </div>
                         );
                       });})()}
@@ -2898,7 +2903,7 @@ export default function App(){
                 if(meses.every(m=>m.rec===0&&m.desp===0)) return null;
                 return(
                   <Card>
-                    <p style={{fontSize:14,fontWeight:600,color:"#fff",marginBottom:14}}>Evolução — últimos 6 meses</p>
+                    <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>Evolução — últimos 6 meses</p>
                     <div style={{display:"flex",gap:8,alignItems:"flex-end",height:120}}>
                       {meses.map((m,i)=>(
                         <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
@@ -2906,28 +2911,28 @@ export default function App(){
                             <div style={{flex:1,background:"rgba(34,197,94,0.6)",borderRadius:"3px 3px 0 0",height:`${maxVal>0?(m.rec/maxVal)*90:0}px`,minHeight:m.rec>0?2:0,transition:"height 0.5s"}}/>
                             <div style={{flex:1,background:"rgba(239,68,68,0.6)",borderRadius:"3px 3px 0 0",height:`${maxVal>0?(m.desp/maxVal)*90:0}px`,minHeight:m.desp>0?2:0,transition:"height 0.5s"}}/>
                           </div>
-                          <p style={{fontSize:9,color:m.atual?"#f59e0b":"#64748b",fontWeight:m.atual?700:400}}>{m.label}</p>
+                          <p style={{fontSize:9,color:m.atual?"#f59e0b":th.textLow,fontWeight:m.atual?700:400}}>{m.label}</p>
                           {m.atual&&<div style={{width:4,height:4,borderRadius:"50%",background:"#f59e0b"}}/>}
                         </div>
                       ))}
                     </div>
                     <div style={{display:"flex",gap:16,marginTop:8,justifyContent:"center"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:"rgba(34,197,94,0.6)"}}/><span style={{fontSize:10,color:"#64748b"}}>Receitas</span></div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:"rgba(239,68,68,0.6)"}}/><span style={{fontSize:10,color:"#64748b"}}>Despesas</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:"rgba(34,197,94,0.6)"}}/><span style={{fontSize:10,color:th.textLow}}>Receitas</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:"rgba(239,68,68,0.6)"}}/><span style={{fontSize:10,color:th.textLow}}>Despesas</span></div>
                     </div>
                   </Card>
                 );
               })()}
 
               {/* Monthly bar */}
-              {transMes.length===0&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Sem dados. Importa o extrato.</p></Card>}
+              {transMes.length===0&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow,fontSize:14}}>Sem dados. Importa o extrato.</p></Card>}
             </div>
           )}
 
           {/* ORÇAMENTO */}
           {tab==="orcamento"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Orçamento</p><p style={{fontSize:12,color:"#64748b",marginBottom:10}}>{MESES[fMes]} {fAno}</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Orçamento</p><p style={{fontSize:12,color:th.textLow,marginBottom:10}}>{MESES[fMes]} {fAno}</p></>}
 
               {/* Controls: copy from previous month + edit */}
               <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
@@ -2970,10 +2975,10 @@ export default function App(){
                 return(
                   <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)",gap:8,marginBottom:14}}>
                     {orcKpis.map(k=>(
-                      <div key={k.label} style={{background:"#0d1a2e",border:`1px solid ${k.color}33`,borderRadius:12,padding:"10px 12px"}}>
-                        <p style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
+                      <div key={k.label} style={{background:th.bgCard,border:`1px solid ${k.color}33`,borderRadius:12,padding:"10px 12px"}}>
+                        <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
                         <p style={{fontSize:15,fontWeight:700,color:k.color}}>{k.val}</p>
-                        <p style={{fontSize:9,color:"#64748b",marginTop:3}}>{k.sub}</p>
+                        <p style={{fontSize:9,color:th.textLow,marginTop:3}}>{k.sub}</p>
                         {k.sub2&&<p style={{fontSize:9,color:k.color,marginTop:1}}>{k.sub2}</p>}
                       </div>
                     ))}
@@ -2985,12 +2990,12 @@ export default function App(){
               {rec.length>0&&(
                 <Card style={{marginBottom:12,background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.2)",cursor:"pointer"}} onClick={()=>setCatModal("Receita")}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <p style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>💵 Receitas <span style={{fontSize:10,color:"#64748b",fontWeight:400}}>— clica para ver movimentos</span></p>
+                    <p style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>💵 Receitas <span style={{fontSize:10,color:th.textLow,fontWeight:400}}>— clica para ver movimentos</span></p>
                     <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE(totR)}</span>
                   </div>
                   {Object.entries(catData["Receita"]?.subs||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([sub,val])=>(
                     <div key={sub} style={{display:"flex",justifyContent:"space-between",padding:"3px 0 3px 8px",borderTop:"1px solid rgba(34,197,94,0.1)"}}>
-                      <span style={{fontSize:12,color:"#64748b"}}>{sub||"Outros"}</span>
+                      <span style={{fontSize:12,color:th.textLow}}>{sub||"Outros"}</span>
                       <span style={{fontSize:12,color:"#22c55e",fontWeight:500}}>{fE(val)}</span>
                     </div>
                   ))}
@@ -3003,19 +3008,19 @@ export default function App(){
                   const cfg=cats[cat],orc=orcMes[cat]||0,d=catData[cat]||{out:0,in:0,subs:{}};
                   const net=NET_CATS.has(cat)?d.out-d.in:d.out,over=net>orc&&orc>0;
                   return(
-                    <div key={cat} style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid #1e3048"}}>
+                    <div key={cat} style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid ${${th.border}}"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:4}} onClick={()=>setCatModal(cat)}>
                         <span style={{fontSize:16,width:22,flexShrink:0}}>{cfg.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,flex:1}}>{cat}</span>
-                        <span style={{fontSize:13,fontWeight:600,color:over?"#ef4444":orc===0?"#64748b":"#fff"}}>{fE(net)}</span>
+                        <span style={{fontSize:13,fontWeight:600,color:over?"#ef4444":orc===0?th.textLow:th.text}}>{fE(net)}</span>
                         {NET_CATS.has(cat)&&d.in>0&&<span style={{fontSize:10,color:"#22c55e"}}>-{fE(d.in)}</span>}
                         {orcEdit?(
                           <input type="number" defaultValue={orc||""} placeholder="0" onClick={e=>e.stopPropagation()}
                             style={{width:70,textAlign:"right",padding:"4px 8px",fontSize:12}}
                             onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[cat]:v}}));}}/>
-                        ):<span style={{fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>/{fE(orc)}</span>}
+                        ):<span style={{fontSize:10,color:th.textLow,whiteSpace:"nowrap"}}>/{fE(orc)}</span>}
                       </div>
-                      {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":"#64748b"}}>{over?`+${fE(net-orc)} acima`:`${fE(orc-net)} livre`}</span></div></>})()}
+                      {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:th.textLow}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":th.textLow}}>{over?`+${fE(net-orc)} acima`:`${fE(orc-net)} livre`}</span></div></>})()}
                       {/* Subcategories with orçamento detail */}
                       {(Object.entries(d.subs||{}).filter(([,v])=>v>0).length>0||orcEdit)&&(
                         <div style={{marginTop:4}}>
@@ -3033,15 +3038,15 @@ export default function App(){
                               <div key={sub} style={{padding:"4px 0 4px 30px",cursor:"pointer"}}
                                 onClick={e=>{e.stopPropagation();setCatModal(cat+"::"+sub);}}>
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
-                                  <span style={{fontSize:11,color:"#94a3b8"}}>{sub||"Sem subcategoria"}</span>
+                                  <span style={{fontSize:11,color:th.textMid}}>{sub||"Sem subcategoria"}</span>
                                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":"#e2e8f0"}}>{fE(val)}</span>
+                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":th.text}}>{fE(val)}</span>
                                     {orcEdit?(
                                       <input type="number" defaultValue={subOrc||""} placeholder="0"
                                         onClick={e=>e.stopPropagation()}
                                         style={{width:65,textAlign:"right",padding:"2px 6px",fontSize:11}}
                                         onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[subOrcKey]:v}}));}}/>
-                                    ):(subOrc>0&&<span style={{fontSize:10,color:"#64748b"}}>/{fE(subOrc)}</span>)}
+                                    ):(subOrc>0&&<span style={{fontSize:10,color:th.textLow}}>/{fE(subOrc)}</span>)}
                                   </div>
                                 </div>
                                 <PBar val={val} max={barMax} color={barColor} h={3}/>
@@ -3053,9 +3058,9 @@ export default function App(){
                             const subOrc=orcMes[subOrcKey]||0;
                             return(
                               <div key={sub} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0 3px 30px"}}>
-                                <span style={{fontSize:11,color:"#475569"}}>{sub} <span style={{fontSize:9}}>(0€)</span></span>
+                                <span style={{fontSize:11,color:th.textLow2}}>{sub} <span style={{fontSize:9}}>(0€)</span></span>
                                 <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                  <span style={{fontSize:10,color:"#64748b"}}>orç.</span>
+                                  <span style={{fontSize:10,color:th.textLow}}>orç.</span>
                                   <input type="number" defaultValue={subOrc||""} placeholder="0"
                                     style={{width:65,textAlign:"right",padding:"2px 6px",fontSize:11}}
                                     onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[subOrcKey]:v}}));}}/>
@@ -3075,11 +3080,11 @@ export default function App(){
           {/* TRANSAÇÕES */}
           {tab==="transacoes"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Transações</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Transações</p></>}
 
               {/* Account selector — dropdown grouped by section */}
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                <span style={{fontSize:12,color:"#64748b",flexShrink:0}}>Conta:</span>
+                <span style={{fontSize:12,color:th.textLow,flexShrink:0}}>Conta:</span>
                 <select value={contaFiltro} onChange={e=>setContaFiltro(e.target.value)}
                   style={{fontSize:13,padding:"7px 12px",flex:1,maxWidth:280}}>
                   <option value="all">— Todas as contas —</option>
@@ -3124,7 +3129,7 @@ export default function App(){
                   {addManual?"✕ Fechar":"＋ Adicionar movimento manual"}
                 </button>
                 {addManual&&(
-                  <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:14,padding:16}}>
+                  <div style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:14,padding:16}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                       <div><Lbl>Data</Lbl><input type="date" value={manualT.data} onChange={e=>setManualT(t=>({...t,data:e.target.value}))}/></div>
                       <div><Lbl>Tipo</Lbl>
@@ -3172,7 +3177,7 @@ export default function App(){
                       applyBalance(manualT.cat,Math.abs(val),manualT.tipo,manualT.contaOrigem,manualT.contaDestino);
                       setManualT({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
                       setAddManual(false);
-                    }} style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontSize:14,width:"100%",fontWeight:600}}>
+                    }} style={{background:"#3b82f6",color:th.text,border:"none",borderRadius:10,padding:"11px",fontSize:14,width:"100%",fontWeight:600}}>
                       ＋ Adicionar movimento
                     </button>
                   </div>
@@ -3189,7 +3194,7 @@ export default function App(){
                 </div>
                 {(search||dateFrom||dateTo||searchVal)&&<button onClick={()=>{setSearch("");setDateFrom("");setDateTo("");setSearchVal("");}} style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"none",padding:"6px",fontSize:12,borderRadius:8}}>✕ Limpar filtros</button>}
               </div>
-              {!filteredTrans.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Sem transações.</p></Card>}
+              {!filteredTrans.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow,fontSize:14}}>Sem transações.</p></Card>}
               {(()=>{
                 // Group by day — style Boonzi
                 const byDay = [];
@@ -3224,7 +3229,7 @@ export default function App(){
                             {saiDia>0&&<span style={{fontSize:10,color:"#ef4444"}}>-{fE(saiDia)}</span>}
                           </div>
                         </div>
-                        <span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>{saldoDia!=null?fE(saldoDia):"—"}</span>
+                        <span style={{fontSize:12,fontWeight:600,color:th.textMid}}>{saldoDia!=null?fE(saldoDia):"—"}</span>
                       </div>
                       {/* Day transactions */}
                       <div style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:10,overflow:"hidden"}}>
@@ -3270,16 +3275,16 @@ export default function App(){
                                   <div style={{flex:1,minWidth:0,marginRight:8}}>
                                     <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                                       <p style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:isMobile?"180px":"400px"}}>{t.ent||t.desc}</p>
-                                      {t.cat&&<Chip label={`${cats[t.cat]?.icon||""} ${t.cat}`} color={cats[t.cat]?.color||"#64748b"} sm/>}
-                                      {t.sub&&<span style={{fontSize:10,color:"#94a3b8"}}>· {t.sub}</span>}
+                                      {t.cat&&<Chip label={`${cats[t.cat]?.icon||""} ${t.cat}`} color={cats[t.cat]?.color||th.textLow} sm/>}
+                                      {t.sub&&<span style={{fontSize:10,color:th.textMid}}>· {t.sub}</span>}
                                       {t.nota&&<span style={{fontSize:10,color:"#f59e0b"}}>📝</span>}
                                       {t.splits?.length>0&&<span style={{fontSize:10,color:"#a855f7"}}>✂</span>}
                                     </div>
-                                    {t.ent&&t.ent!==t.desc&&<p style={{fontSize:10,color:"#475569",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{t.desc}</p>}
+                                    {t.ent&&t.ent!==t.desc&&<p style={{fontSize:10,color:th.textLow2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{t.desc}</p>}
                                   </div>
                                   <div style={{textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
                                     <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}} style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"2px 6px",fontSize:10,cursor:"pointer"}}>✂</button>
-                                    <p style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?"#64748b":"#e2e8f0",whiteSpace:"nowrap"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
+                                    <p style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?th.textLow:th.text,whiteSpace:"nowrap"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
                                   </div>
                                 </div>
                               </div>
@@ -3297,8 +3302,8 @@ export default function App(){
           {/* CATEGORIZAR — estilo Boonzi: lista com pré-preenchimento */}
           {tab==="categorizar"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Categorizar movimentos</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>{pend.length} movimentos · {pend.filter(t=>t.ok).length} pré-preenchidos · {pend.filter(t=>!t.ok).length} por categorizar</p></>}
-              {!pend.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:"#64748b",fontSize:14}}>Tudo categorizado ✓</p></Card>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Categorizar movimentos</p><p style={{fontSize:12,color:th.textLow,marginBottom:12}}>{pend.length} movimentos · {pend.filter(t=>t.ok).length} pré-preenchidos · {pend.filter(t=>!t.ok).length} por categorizar</p></>}
+              {!pend.length&&<Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow,fontSize:14}}>Tudo categorizado ✓</p></Card>}
               {pend.length>0&&(
                 <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
                   <Btn variant="success" style={{fontSize:12,padding:"8px 16px"}} onClick={()=>{
@@ -3329,11 +3334,11 @@ export default function App(){
                 </div>
               )}
               {/* Lista compacta — novo layout centrado */}
-              <div style={{background:"#0d1a2e",border:"1px solid #1e3048",borderRadius:16,overflow:"hidden"}}>
+              <div style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:16,overflow:"hidden"}}>
                 {/* Header */}
-                <div style={{display:"grid",gridTemplateColumns:"90px 1fr 200px 170px 90px 32px",gap:8,padding:"10px 16px",borderBottom:"1px solid #1e3048",background:"#0a1220"}}>
+                <div style={{display:"grid",gridTemplateColumns:"90px 1fr 200px 170px 90px 32px",gap:8,padding:"10px 16px",borderBottom:`1px solid ${th.border}`,background:th.bgAlt}}>
                   {["Data","Descrição","Categoria","Subcategoria","Valor",""].map((h,i)=>(
-                    <span key={i} style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
+                    <span key={i} style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</span>
                   ))}
                 </div>
                 {pend.map(t=>{
@@ -3349,20 +3354,20 @@ export default function App(){
                       {/* Compact row */}
                       <div className="catrow" style={{display:"grid",gridTemplateColumns:"90px 1fr 200px 170px 90px 32px",gap:8,padding:"10px 16px",alignItems:"center",background:bgRow,cursor:"pointer"}}
                         onClick={()=>setPEd(p=>({...p,[t.id]:{...p[t.id],expanded:!isExpanded}}))}>
-                        <span style={{fontSize:12,color:"#64748b",fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
+                        <span style={{fontSize:12,color:th.textLow,fontFamily:"monospace"}}>{t.data.slice(5).split("-").reverse().join("/")}</span>
                         <div style={{minWidth:0}}>
-                          <p style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.ok?"#e2e8f0":"#94a3b8"}}>{entA||t.desc}</p>
-                          <p style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
+                          <p style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:t.ok?th.text:th.textMid}}>{entA||t.desc}</p>
+                          <p style={{fontSize:11,color:th.textLow,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</p>
                           {!t.ok&&<input type="text" defaultValue={entA} placeholder="Entidade..." onClick={e=>e.stopPropagation()}
                             onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],ent:e.target.value}}))}
-                            style={{fontSize:11,padding:"2px 6px",marginTop:3,width:"100%",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:6,color:"#94a3b8"}}/>}
+                            style={{fontSize:11,padding:"2px 6px",marginTop:3,width:"100%",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:6,color:th.textMid}}/>}
                         </div>
                         <div onClick={e=>e.stopPropagation()}>
                           <select value={catA} onChange={e=>{
                             const newCat=e.target.value;
                             setPEd(p=>({...p,[t.id]:{...p[t.id],cat:newCat,sub:""}}));
                           }}
-                            style={{fontSize:12,padding:"5px 8px",width:"100%",background:!catA?"rgba(239,68,68,0.1)":"#0f1d2e",borderColor:!catA?"rgba(239,68,68,0.4)":"#1e3048"}}>
+                            style={{fontSize:12,padding:"5px 8px",width:"100%",background:!catA?"rgba(239,68,68,0.1)":th.bgInput,borderColor:!catA?"rgba(239,68,68,0.4)":th.border}}>
                             <option value="">-- categorizar --</option>
                             {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
                           </select>
@@ -3395,12 +3400,12 @@ export default function App(){
                             {(cats[catA]?.subs||[]).map(s=><option key={s} value={s}>{s}</option>)}
                           </select>
                         </div>
-                        <span style={{fontSize:13,fontWeight:700,color:t.tipo==="c"?"#22c55e":"#e2e8f0",whiteSpace:"nowrap",textAlign:"right"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
-                        <span style={{fontSize:12,color:"#64748b",textAlign:"center"}}>{isExpanded?"▲":"▼"}</span>
+                        <span style={{fontSize:13,fontWeight:700,color:t.tipo==="c"?"#22c55e":th.text,whiteSpace:"nowrap",textAlign:"right"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
+                        <span style={{fontSize:12,color:th.textLow,textAlign:"center"}}>{isExpanded?"▲":"▼"}</span>
                       </div>
                       {/* Expanded detail */}
                       {isExpanded&&(
-                        <div style={{padding:"12px 14px",background:"#070d1a",borderTop:"1px solid #1e3048"}}>
+                        <div style={{padding:"12px 14px",background:th.bg,borderTop:"1px solid ${${th.border}}"}}>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                             <div><Lbl>Data</Lbl><input type="date" defaultValue={t.data} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],data:e.target.value}}))} /></div>
                             <div><Lbl>Entidade</Lbl><input type="text" defaultValue={entA} placeholder="Ex: Continente" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],ent:e.target.value}}))} /></div>
@@ -3458,15 +3463,15 @@ export default function App(){
           {/* CONTAS */}
           {tab==="contas"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Contas</p><p style={{fontSize:12,color:"#64748b",marginBottom:12}}>Gere saldos e contas</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Contas</p><p style={{fontSize:12,color:th.textLow,marginBottom:12}}>Gere saldos e contas</p></>}
               <button onClick={()=>{setTab("transacoes");setAddManual(true);}} style={{width:"100%",background:"rgba(59,130,246,0.08)",color:"#3b82f6",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px",fontSize:13,marginBottom:12}}>
                 ＋ Adicionar movimento manual
               </button>
 
               {/* Saldo por data — single card */}
               <Card style={{marginBottom:14}}>
-                <p style={{fontSize:13,fontWeight:600,color:"#fff",marginBottom:12}}>📍 Registar saldo</p>
-                <p style={{fontSize:11,color:"#64748b",marginBottom:12}}>Define o saldo de uma conta numa data específica. Os movimentos após essa data actualizam o saldo automaticamente.</p>
+                <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:12}}>📍 Registar saldo</p>
+                <p style={{fontSize:11,color:th.textLow,marginBottom:12}}>Define o saldo de uma conta numa data específica. Os movimentos após essa data actualizam o saldo automaticamente.</p>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,alignItems:"end"}}>
                   <div>
                     <Lbl>Conta</Lbl>
@@ -3495,16 +3500,16 @@ export default function App(){
                 </div>
                 {/* Show current snapshots */}
                 {contas.filter(c=>c.saldoRef!=null).length>0&&(
-                  <div style={{marginTop:12,borderTop:"1px solid #1e3048",paddingTop:10}}>
-                    <p style={{fontSize:10,color:"#64748b",marginBottom:6}}>SALDOS DE REFERÊNCIA</p>
+                  <div style={{marginTop:12,borderTop:"1px solid ${${th.border}}",paddingTop:10}}>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:6}}>SALDOS DE REFERÊNCIA</p>
                     {contas.filter(c=>c.saldoRef!=null).map(c=>(
                       <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0"}}>
-                        <span style={{fontSize:12,color:"#e2e8f0"}}>{c.icon} {c.nome}</span>
+                        <span style={{fontSize:12,color:th.text}}>{c.icon} {c.nome}</span>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
-                          <span style={{fontSize:11,color:"#64748b"}}>{c.saldoRefData}</span>
+                          <span style={{fontSize:11,color:th.textLow}}>{c.saldoRefData}</span>
                           <span style={{fontSize:12,fontWeight:600,color:"#22c55e"}}>{fE(c.saldoRef)}</span>
                           <span style={{fontSize:12,fontWeight:700,color:"#3b82f6"}}>→ {fE(contaSaldos[c.id]??0)}</span>
-                          <button onClick={()=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldoRef:null,saldoRefData:null}:x))} style={{background:"none",border:"none",color:"#64748b",fontSize:12,cursor:"pointer"}}>×</button>
+                          <button onClick={()=>setContas(prev=>prev.map(x=>x.id===c.id?{...x,saldoRef:null,saldoRefData:null}:x))} style={{background:"none",border:"none",color:th.textLow,fontSize:12,cursor:"pointer"}}>×</button>
                         </div>
                       </div>
                     ))}
@@ -3512,14 +3517,14 @@ export default function App(){
                 )}
               </Card>
 
-              <Card><div style={{display:"flex",justifyContent:"space-between"}}><div><p style={{fontSize:11,color:"#64748b",marginBottom:3}}>Património total</p><p style={{fontSize:24,fontWeight:700,color:"#22c55e"}}>{fE(patrimonioTotal)}</p></div></div></Card>
+              <Card><div style={{display:"flex",justifyContent:"space-between"}}><div><p style={{fontSize:11,color:th.textLow,marginBottom:3}}>Património total</p><p style={{fontSize:24,fontWeight:700,color:"#22c55e"}}>{fE(patrimonioTotal)}</p></div></div></Card>
             </div>
           )}
 
           {/* CATEGORIAS */}
           {tab==="categorias"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Categorias</p><p style={{fontSize:12,color:"#64748b",marginBottom:14}}>Gere as tuas categorias e subcategorias</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Categorias</p><p style={{fontSize:12,color:th.textLow,marginBottom:14}}>Gere as tuas categorias e subcategorias</p></>}
               <Btn variant="primary" full onClick={()=>setNewCatModal(true)} style={{marginBottom:12,fontSize:13}}>+ Nova categoria</Btn>
               {Object.entries(cats).map(([cat,cfg])=>(
                 <Card key={cat} style={{marginBottom:8}}>
@@ -3527,13 +3532,13 @@ export default function App(){
                     <span style={{fontSize:20}}>{cfg.icon}</span>
                     <span style={{fontSize:14,fontWeight:600,color:cfg.color,flex:1}}>{cat}</span>
                     <div style={{width:16,height:16,borderRadius:4,background:cfg.color}}/>
-                    <button onClick={()=>{if(confirm(`Apagar categoria "${cat}"?`)){const c={...cats};delete c[cat];setCats(c);}}} style={{background:"none",border:"none",color:"#64748b",fontSize:16,cursor:"pointer",padding:"0 4px"}}>×</button>
+                    <button onClick={()=>{if(confirm(`Apagar categoria "${cat}"?`)){const c={...cats};delete c[cat];setCats(c);}}} style={{background:"none",border:"none",color:th.textLow,fontSize:16,cursor:"pointer",padding:"0 4px"}}>×</button>
                   </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {(cfg.subs||[]).map(s=>(
-                      <div key={s} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.05)",borderRadius:20,padding:"3px 10px"}}>
-                        <span style={{fontSize:11,color:"#94a3b8"}}>{s}</span>
-                        <button onClick={()=>setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.filter(x=>x!==s)}}))} style={{background:"none",border:"none",color:"#64748b",fontSize:12,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
+                      <div key={s} style={{display:"flex",alignItems:"center",gap:4,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:20,padding:"3px 10px"}}>
+                        <span style={{fontSize:11,color:th.textMid}}>{s}</span>
+                        <button onClick={()=>setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.filter(x=>x!==s)}}))} style={{background:"none",border:"none",color:th.textLow,fontSize:12,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
                       </div>
                     ))}
                     <button onClick={()=>{const s=prompt("Nova subcategoria:");if(s)setCats(prev=>({...prev,[cat]:{...prev[cat],subs:[...(prev[cat].subs||[]),s]}}));}} style={{background:"rgba(59,130,246,0.1)",border:"none",color:"#3b82f6",borderRadius:20,padding:"3px 10px",fontSize:11,cursor:"pointer"}}>+ subcategoria</button>
@@ -3546,7 +3551,7 @@ export default function App(){
           {/* IMPORTAR */}
           {tab==="importar"&&(
             <div>
-              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:"#fff",marginBottom:2}}>Importar</p><p style={{fontSize:12,color:"#64748b",marginBottom:14}}>Millennium BCP → Movimentos → Exportar</p></>}
+              {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Importar</p><p style={{fontSize:12,color:th.textLow,marginBottom:14}}>Millennium BCP → Movimentos → Exportar</p></>}
               <Btn variant="primary" full onClick={()=>fileRef.current?.click()} style={{marginBottom:10,fontSize:14,padding:"14px"}}>↑ Selecionar ficheiro Excel</Btn>
               <input ref={fileRef} type="file" accept=".xls,.xlsx,.csv,.txt" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
               <Card>
@@ -3557,11 +3562,11 @@ export default function App(){
               </Card>
               {importMsg&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:10}}><p style={{fontSize:13,color:"#22c55e"}}>{importMsg}</p></div>}
               <Card>
-                <p style={{fontSize:12,color:"#64748b",marginBottom:6}}>Base de dados · {trans.length} transações · {pend.length} por categorizar</p>
+                <p style={{fontSize:12,color:th.textLow,marginBottom:6}}>Base de dados · {trans.length} transações · {pend.length} por categorizar</p>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   <Btn onClick={exportJSON} style={{fontSize:12}}>↓ Exportar backup JSON</Btn>
                   <Btn onClick={exportExcel} style={{fontSize:12,background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.2)"}}>↓ Exportar Excel/CSV</Btn>
-                  <label style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"1px solid #1e3048",borderRadius:10,padding:"8px 14px",fontSize:12,cursor:"pointer"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
+                  <label style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,border:"1px solid ${${th.border}}",borderRadius:10,padding:"8px 14px",fontSize:12,cursor:"pointer"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
                   <Btn variant="danger" style={{fontSize:12}} onClick={()=>{if(confirm("Apagar todas as transações?")){setTrans([]);setPend([]);}}}>Apagar</Btn>
                 </div>
               </Card>
@@ -3604,12 +3609,12 @@ export default function App(){
               <span style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":th.text,flexShrink:0}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
             </div>
           ))}
-          <div style={{marginTop:14,padding:"10px",background:"rgba(255,255,255,0.03)",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
-            <span style={{fontSize:13,color:"#64748b"}}>Total saídas</span>
+          <div style={{marginTop:14,padding:"10px",background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
+            <span style={{fontSize:13,color:th.textLow}}>Total saídas</span>
             <span style={{fontSize:14,fontWeight:600,color:"#ef4444"}}>{fE(catTransactions.filter(t=>t.tipo==="d").reduce((a,t)=>a+t.val,0))}</span>
           </div>
           {catTransactions.some(t=>t.tipo==="c")&&<div style={{padding:"6px 10px",background:"rgba(34,197,94,0.08)",borderRadius:10,display:"flex",justifyContent:"space-between",marginTop:6}}>
-            <span style={{fontSize:13,color:"#64748b"}}>Reembolsos/entradas</span>
+            <span style={{fontSize:13,color:th.textLow}}>Reembolsos/entradas</span>
             <span style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE(catTransactions.filter(t=>t.tipo==="c").reduce((a,t)=>a+t.val,0))}</span>
           </div>}
         </Modal>
@@ -3625,15 +3630,15 @@ export default function App(){
         const ok=diff<0.01;
         return(
           <Modal onClose={()=>setSplitModal(null)}>
-            <p style={{fontSize:16,fontWeight:600,color:"#fff",marginBottom:4}}>✂ Dividir movimento</p>
-            <p style={{fontSize:12,color:"#64748b",marginBottom:6}}>{t.ent||t.desc} · {fE(t.val)}</p>
+            <p style={{fontSize:16,fontWeight:600,color:th.text,marginBottom:4}}>✂ Dividir movimento</p>
+            <p style={{fontSize:12,color:th.textLow,marginBottom:6}}>{t.ent||t.desc} · {fE(t.val)}</p>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:12,padding:"6px 10px",background:ok?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",borderRadius:8}}>
               <span style={{fontSize:12,color:ok?"#22c55e":"#ef4444"}}>Total partes: {fE(total)}</span>
               {!ok&&<span style={{fontSize:12,color:"#ef4444"}}>Falta: {fE(t.val-total)}</span>}
               {ok&&<span style={{fontSize:12,color:"#22c55e"}}>✓ Bate certo</span>}
             </div>
             {splitParts.map((p,i)=>(
-              <div key={p.id} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px",marginBottom:8}}>
+              <div key={p.id} style={{background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,padding:"10px",marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <span style={{fontSize:12,fontWeight:600,color:"#a855f7"}}>Parte {i+1}</span>
                   {splitParts.length>1&&<button onClick={()=>setSplitParts(prev=>prev.filter((_,j)=>j!==i))}
