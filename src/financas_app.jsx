@@ -2397,114 +2397,214 @@ export default function App(){
                 }).filter(Boolean)}
               </div>
 
-              {/* Gráfico de linhas do investimento seleccionado */}
+              {/* Gráfico helper — reutilizável para individual e agregado */}
               {(()=>{
-                const item=invItems.find(a=>a.id===invSelected)||invItems[0];
-                if(!item) return null;
-                const contaMatch=contas.find(c=>c.nome.toLowerCase().includes(item.label.toLowerCase().split(" ").pop().toLowerCase()));
-                const realHistory=patSnaps.map(s=>{
-                  const v=s.ativos?.[item.id]?.valor;
-                  return{mes:s.mes,val:v||null};
-                }).filter(d=>d.val!==null);
-                if(!realHistory.length) return null;
-                const lastVal=contaMatch?contaMatch.saldo:realHistory[realHistory.length-1]?.val||0;
-                const lastInv=patSnaps[patSnaps.length-1]?.ativos?.[item.id]?.investido||0;
-                // Build projections from today
+                const anoBase=new Date().getFullYear();
+                const mesBase=new Date().getMonth(); // 0-indexed
                 const projYears=20;
                 const projMonths=projYears*12;
                 const r5=5/100/12,r8=8/100/12,r10=10/100/12;
-                const monthly=item.id==="xtb"?100:0;
-                const proj=(rate)=>{
-                  const pts=[];let c=lastVal;
+
+                // Calcular projecção com data labels de valor
+                const buildProj=(startVal,monthly,rate)=>{
+                  const pts=[];let c=startVal;
                   for(let i=0;i<=projMonths;i+=12){
-                    pts.push({yr:i/12,val:c});
+                    pts.push({yr:i/12,anoReal:anoBase+i/12,val:Math.round(c)});
                     for(let m=0;m<12;m++)c=c*(1+rate)+monthly;
                   }
                   return pts;
                 };
-                const p5=proj(r5),p8=proj(r8),p10=proj(r10);
-                const allVals=[...p10.map(p=>p.val),...realHistory.map(d=>d.val)];
-                const maxV=Math.max(...allVals,1);
-                const H=130;
-                const toY=v=>H-(v/maxV)*H;
-                const toX=(i,total)=>`${(i/(total-1))*100}%`;
-                return(
-                  <Card>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                      <p style={{fontSize:14,fontWeight:600,color:th.text}}>{item.icon} {item.label} — Histórico + Projecção</p>
-                      <select value={invSelected} onChange={e=>setInvSelected(e.target.value)} style={{fontSize:11,padding:"4px 8px"}}>
-                        {invItems.filter(a=>patSnaps.some(s=>s.ativos?.[a.id]?.valor)).map(a=>(
-                          <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {(()=>{
-                      const IPL=55,IPR=15,IPT=15,IPB=30,IW=600,IH=H+20;
-                      const innerIW=IW-IPL-IPR,innerIH=IH-IPT-IPB;
-                      const toIX=(i,total)=>IPL+(i/(total-1))*innerIW;
-                      const toIY=v=>IPT+innerIH-((v/maxV)*innerIH);
-                      const fmtI=v=>v>=1000000?(v/1000000).toFixed(2)+"M":v>=1000?(v/1000).toFixed(0)+"k":"0";
-                      const yTicksI=[0,0.25,0.5,0.75,1].map(p=>maxV*p);
-                      const xTicksI=Array.from({length:projYears+1},(_,i)=>i).filter(i=>i%5===0);
-                      return(
-                        <svg viewBox={`0 0 ${IW} ${IH}`} width="100%" height={IH} style={{overflow:"visible"}}>
-                          {/* Y grid + labels */}
-                          {yTicksI.map((v,i)=>(
-                            <g key={i}>
-                              <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke={th.border} strokeWidth="1" strokeDasharray="3,3"/>
-                              <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill={th.textLow} fontSize="9">{fmtI(v)}</text>
-                            </g>
-                          ))}
-                          {/* X labels */}
-                          {xTicksI.map(yr=>(
-                            <g key={yr}>
-                              <line x1={toIX(yr,projYears+1)} y1={IPT} x2={toIX(yr,projYears+1)} y2={IH-IPB} stroke={th.border} strokeWidth="1" strokeDasharray="2,4" opacity="0.5"/>
-                              <text x={toIX(yr,projYears+1)} y={IH-IPB+14} textAnchor="middle" fill={th.textLow} fontSize="9">{yr}a</text>
-                            </g>
-                          ))}
-                          {/* Eixos */}
-                          <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
-                          <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
-                          {/* Proj lines */}
-                          {[{pts:p5,color:th.textLow},{pts:p8,color:"#06b6d4"},{pts:p10,color:"#f59e0b"}].map(({pts,color})=>(
-                            <polyline key={color}
-                              points={pts.map((p,i)=>`${toIX(i,pts.length)},${toIY(p.val)}`).join(" ")}
-                              fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.8"/>
-                          ))}
-                          {/* Real line — positioned by year */}
-                          {realHistory.length>1&&(()=>{
-                            // Map mes to year fraction from Apr 2026
-                            const origin=new Date(2026,3,1);
-                            const toYrFrac=mes=>{
-                              const d=new Date(mes+"-01");
-                              return (d.getFullYear()-2026)*12+(d.getMonth()-3);
-                            };
-                            const pts=realHistory.map((d,i)=>{
-                              const mFrac=i===0?0:toYrFrac(d.mes);
-                              const yr=mFrac/12;
-                              return{x:toIX(Math.min(yr,projYears),projYears+1),y:toIY(d.val),val:d.val};
-                            });
-                            return(<>
-                              <polyline points={pts.map(p=>`${p.x},${p.y}`).join(" ")}
-                                fill="none" stroke="#a855f7" strokeWidth="2.5"/>
-                              {pts.map((p,i)=>(
-                                <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" stroke={th.bgCard} strokeWidth="2"/>
-                              ))}
-                            </>);
-                          })()}
-                        </svg>
-                      );
-                    })()}
-                    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
-                      {[{color:"#a855f7",label:"Real"},{color:th.textLow,label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true}].map(l=>(
-                        <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
-                          <div style={{width:16,height:2,background:l.color,borderRadius:1,opacity:l.dash?0.7:1,borderTop:l.dash?"2px dashed "+l.color:"none"}}/>
-                          <span style={{fontSize:10,color:th.textLow}}>{l.label}</span>
+
+                const fmtV=v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?(v/1000).toFixed(0)+"k":v.toFixed(0)+"€";
+
+                // ── Componente InvChart com tooltip + painel lateral interactivo ──
+                const InvChart=({label,icon,startVal,monthly,realHistory,color,chartId})=>{
+                  const [selYr,setSelYr]=useState(10);
+                  const [tooltip,setTooltip]=useState(null); // {x,y,val,label,yr}
+                  const p5=buildProj(startVal,monthly,r5);
+                  const p8=buildProj(startVal,monthly,r8);
+                  const p10=buildProj(startVal,monthly,r10);
+                  const allVals=[...p10.map(p=>p.val),...(realHistory||[]).map(d=>d.val),startVal];
+                  const maxV=Math.max(...allVals,1);
+                  const IPL=52,IPR=12,IPT=20,IPB=24,IW=600,IH=170;
+                  const innerIW=IW-IPL-IPR,innerIH=IH-IPT-IPB;
+                  const toIX=(yr)=>IPL+(yr/projYears)*innerIW;
+                  const toIY=v=>IPT+innerIH-((v/maxV)*innerIH);
+                  const xTicks=[0,5,10,15,20];
+                  const selVals={
+                    v5:p5.find(p=>p.yr===selYr)?.val??0,
+                    v8:p8.find(p=>p.yr===selYr)?.val??0,
+                    v10:p10.find(p=>p.yr===selYr)?.val??0,
+                  };
+                  const lines=[
+                    {pts:p5,color:th.textMid,label:"5%"},
+                    {pts:p8,color:"#06b6d4",label:"8%"},
+                    {pts:p10,color:"#f59e0b",label:"10%"},
+                  ];
+                  return(
+                    <div>
+                      <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                        {/* SVG chart */}
+                        <div style={{flex:1,minWidth:0,position:"relative"}}>
+                          <svg viewBox={`0 0 ${IW} ${IH}`} width="100%" height={IH} style={{overflow:"visible",cursor:"crosshair"}}
+                            onMouseLeave={()=>setTooltip(null)}>
+                            {/* Y grid */}
+                            {[0,0.25,0.5,0.75,1].map((p,i)=>{
+                              const v=maxV*p;
+                              return(<g key={i}>
+                                <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke={th.border} strokeWidth="1" strokeDasharray="3,3"/>
+                                <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill={th.textLow} fontSize="9">{fmtV(v)}</text>
+                              </g>);
+                            })}
+                            {/* Eixos */}
+                            <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
+                            <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
+                            {/* X ticks — clicáveis para actualizar painel */}
+                            {xTicks.map(yr=>{
+                              const x=toIX(yr);
+                              const isSel=selYr===yr;
+                              return(<g key={yr} style={{cursor:"pointer"}} onClick={()=>setSelYr(yr)}>
+                                <line x1={x} y1={IPT} x2={x} y2={IH-IPB}
+                                  stroke={isSel?"#3b82f6":th.border} strokeWidth={isSel?2:1}
+                                  strokeDasharray={isSel?"none":"2,4"} opacity={isSel?1:0.4}/>
+                                <rect x={x-14} y={IH-IPB+2} width={28} height={16} rx={4}
+                                  fill={isSel?"#3b82f6":"transparent"} opacity={0.15}/>
+                                <text x={x} y={IH-IPB+13} textAnchor="middle"
+                                  fill={isSel?"#3b82f6":th.textLow} fontSize="9" fontWeight={isSel?"700":"400"}>{yr}a</text>
+                              </g>);
+                            })}
+                            {/* Linha vertical do ano seleccionado */}
+                            <line x1={toIX(selYr)} y1={IPT} x2={toIX(selYr)} y2={IH-IPB}
+                              stroke="#3b82f6" strokeWidth="1.5" opacity="0.4"/>
+                            {/* Proj lines com pontos hover */}
+                            {lines.map(({pts,color:lc,label:ll},li)=>(
+                              <g key={li}>
+                                <polyline
+                                  points={pts.map(p=>`${toIX(p.yr)},${toIY(p.val)}`).join(" ")}
+                                  fill="none" stroke={lc} strokeWidth={li===1?2:1.5} strokeDasharray="5,3" opacity="0.85"/>
+                                {/* Pontos hover em cada ano */}
+                                {pts.filter(p=>p.yr>0).map((p,pi)=>(
+                                  <circle key={pi} cx={toIX(p.yr)} cy={toIY(p.val)} r="5"
+                                    fill="transparent" stroke="transparent"
+                                    onMouseEnter={e=>setTooltip({x:toIX(p.yr),y:toIY(p.val),val:p.val,lc,ll,yr:p.yr})}
+                                    style={{cursor:"pointer"}}/>
+                                ))}
+                                {/* Ponto destacado no ano seleccionado */}
+                                {(()=>{const sp=pts.find(p=>p.yr===selYr);if(!sp)return null;return(
+                                  <circle cx={toIX(sp.yr)} cy={toIY(sp.val)} r="4" fill={lc} stroke={th.bgCard} strokeWidth="1.5" opacity="0.9"/>
+                                );})()}
+                              </g>
+                            ))}
+                            {/* Real history line */}
+                            {realHistory&&realHistory.length>0&&(()=>{
+                              const toYrFrac=mes=>{const d=new Date(mes+"-01");return(d.getFullYear()-anoBase)*12+(d.getMonth()-mesBase);};
+                              const allPts=[{x:toIX(0),y:toIY(startVal),val:startVal,yr:0}];
+                              realHistory.forEach(d=>{
+                                const yr=Math.max(0,toYrFrac(d.mes)/12);
+                                if(yr<=projYears) allPts.push({x:toIX(yr),y:toIY(d.val),val:d.val,yr,mes:d.mes});
+                              });
+                              return(<>
+                                <polyline points={allPts.map(p=>`${p.x},${p.y}`).join(" ")}
+                                  fill="none" stroke={color} strokeWidth="2.5"/>
+                                {allPts.map((p,i)=>(
+                                  <circle key={i} cx={p.x} cy={p.y} r="4" fill={color} stroke={th.bgCard} strokeWidth="1.5"
+                                    onMouseEnter={()=>setTooltip({x:p.x,y:p.y,val:p.val,lc:color,ll:"Real",yr:p.yr})}
+                                    style={{cursor:"pointer"}}/>
+                                ))}
+                              </>);
+                            })()}
+                            {/* Tooltip */}
+                            {tooltip&&(()=>{
+                              const TW=80,TH=26;
+                              const tx=Math.min(tooltip.x+8,IW-IPR-TW);
+                              const ty=Math.max(tooltip.y-TH-6,IPT);
+                              return(<g>
+                                <rect x={tx} y={ty} width={TW} height={TH} rx={5}
+                                  fill={th.bgCard} stroke={tooltip.lc} strokeWidth="1.5" opacity="0.97"/>
+                                <text x={tx+TW/2} y={ty+10} textAnchor="middle" fill={tooltip.lc} fontSize="8" fontWeight="700">{tooltip.ll} · {tooltip.yr}a</text>
+                                <text x={tx+TW/2} y={ty+21} textAnchor="middle" fill={th.text} fontSize="10" fontWeight="700">{fmtV(tooltip.val)}</text>
+                              </g>);
+                            })()}
+                          </svg>
                         </div>
-                      ))}
+                        {/* Painel lateral — valores no ano seleccionado */}
+                        <div style={{width:110,flexShrink:0,background:th.bgAlt,borderRadius:10,padding:"10px 12px",border:`1px solid ${th.border}`}}>
+                          <p style={{fontSize:10,fontWeight:700,color:"#3b82f6",marginBottom:8,textAlign:"center"}}>📍 {selYr} anos</p>
+                          {[{v:selVals.v5,c:th.textMid,l:"5%"},{v:selVals.v8,c:"#06b6d4",l:"8%"},{v:selVals.v10,c:"#f59e0b",l:"10%"}].map(({v,c,l})=>(
+                            <div key={l} style={{marginBottom:6,padding:"4px 6px",borderRadius:6,background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)"}}>
+                              <p style={{fontSize:9,color:th.textLow,marginBottom:1}}>{l}</p>
+                              <p style={{fontSize:13,fontWeight:700,color:c}}>{fmtV(v)}</p>
+                            </div>
+                          ))}
+                          <p style={{fontSize:8,color:th.textLow,marginTop:6,textAlign:"center"}}>clica no eixo X para mudar</p>
+                        </div>
+                      </div>
+                      {/* Legenda */}
+                      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:6}}>
+                        {[{color,label:"Real"},{color:th.textMid,label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true}].map(l=>(
+                          <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
+                            <div style={{width:16,height:2,background:l.color,borderRadius:1,borderTop:l.dash?`2px dashed ${l.color}`:"none"}}/>
+                            <span style={{fontSize:10,color:th.textLow}}>{l.label}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  );
+                };
+
+                // ── Gráfico individual ──
+                const item=invItems.find(a=>a.id===invSelected)||invItems[0];
+                const individualChart=item?(()=>{
+                  const realHistory=patSnaps.map(s=>{
+                    const v=s.ativos?.[item.id]?.valor;
+                    return{mes:s.mes,val:v||null};
+                  }).filter(d=>d.val!==null);
+                  const startVal=realHistory.length?realHistory[realHistory.length-1].val:0;
+                  const monthly=item.id==="xtb"?100:0;
+                  return(
+                    <Card>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <p style={{fontSize:13,fontWeight:600,color:th.text}}>{item.icon} {item.label} — Projecção</p>
+                        <select value={invSelected} onChange={e=>setInvSelected(e.target.value)} style={{fontSize:11,padding:"4px 8px"}}>
+                          {invItems.map(a=>(
+                            <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <p style={{fontSize:10,color:th.textLow,marginBottom:10}}>
+                        Ponto de partida: <span style={{fontWeight:600,color:item.color||"#a855f7"}}>{fmtV(startVal)}</span>
+                        <span style={{color:th.textLow2}}> · clica nos pontos para tooltip · clica no eixo X para ver valores por cenário</span>
+                      </p>
+                      <InvChart label={item.label} icon={item.icon} startVal={startVal} monthly={monthly}
+                        realHistory={realHistory} color={item.color||"#a855f7"} chartId={item.id}/>
+                    </Card>
+                  );
+                })():null;
+
+                // ── Gráfico agregado (excluindo PPR Lexie) ──
+                const agregItems=invItems.filter(a=>a.id!=="ppr_lex");
+                const agregStart=agregItems.reduce((sum,it)=>{
+                  const history=patSnaps.map(s=>s.ativos?.[it.id]?.valor).filter(Boolean);
+                  return sum+(history.length?history[history.length-1]:0);
+                },0);
+                const agregMonthly=agregItems.reduce((sum,it)=>sum+(it.id==="xtb"?100:0),0);
+                const agregHistory=patSnaps.map(s=>{
+                  const v=agregItems.reduce((a,it)=>a+(s.ativos?.[it.id]?.valor||0),0);
+                  return{mes:s.mes,val:v>0?v:null};
+                }).filter(d=>d.val!==null);
+
+                const agregChart=agregStart>0?(
+                  <Card>
+                    <p style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:4}}>📊 Total Investimentos — Projecção Agregada</p>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:10}}>
+                      Todos os investimentos excl. PPR Lexie · Ponto de partida: <span style={{fontWeight:600,color:"#22c55e"}}>{fmtV(agregStart)}</span>
+                    </p>
+                    <InvChart label="Agregado" icon="📊" startVal={agregStart} monthly={agregMonthly}
+                      realHistory={agregHistory} color="#22c55e" chartId="agregado"/>
                   </Card>
-                );
+                ):null;
+
+                return(<>{individualChart}{agregChart}</>);
               })()}
             </>);
           })()}
@@ -3005,19 +3105,30 @@ export default function App(){
               {/* Despesas por categoria */}
               <Card>
                 {Object.keys(cats).filter(c=>!["Transferência Interna","Receita","Poupança"].includes(c)).sort((a,b)=>a.localeCompare(b,"pt")).map(cat=>{
-                  const cfg=cats[cat],orc=orcMes[cat]||0,d=catData[cat]||{out:0,in:0,subs:{}};
-                  const net=NET_CATS.has(cat)?d.out-d.in:d.out,over=net>orc&&orc>0;
+                  const cfg=cats[cat],d=catData[cat]||{out:0,in:0,subs:{}};
+                  const net=NET_CATS.has(cat)?d.out-d.in:d.out;
+                  // Orçamento da categoria = soma das subcategorias (auto-calculado)
+                  const subOrcTotal=Object.keys(d.subs||{}).reduce((a,sub)=>{
+                    const key=`${cat}::${sub}`;
+                    return a+(orcMes[key]||0);
+                  },0);
+                  // Se não há sub-orçamentos, usar orçamento manual da categoria como fallback
+                  const orc=subOrcTotal>0?subOrcTotal:(orcMes[cat]||0);
+                  const over=net>orc&&orc>0;
                   return(
-                    <div key={cat} style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid ${${th.border}}"}}>
+                    <div key={cat} style={{marginBottom:12,paddingBottom:12,borderBottom:`1px solid ${th.border}`}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:4}} onClick={()=>setCatModal(cat)}>
                         <span style={{fontSize:16,width:22,flexShrink:0}}>{cfg.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,flex:1}}>{cat}</span>
                         <span style={{fontSize:13,fontWeight:600,color:over?"#ef4444":orc===0?th.textLow:th.text}}>{fE(net)}</span>
                         {NET_CATS.has(cat)&&d.in>0&&<span style={{fontSize:10,color:"#22c55e"}}>-{fE(d.in)}</span>}
                         {orcEdit?(
-                          <input type="number" defaultValue={orc||""} placeholder="0" onClick={e=>e.stopPropagation()}
-                            style={{width:70,textAlign:"right",padding:"4px 8px",fontSize:12}}
-                            onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[cat]:v}}));}}/>
+                          // Em modo edição: mostrar total calculado (read-only) se há sub-orçamentos, senão campo manual
+                          subOrcTotal>0
+                            ? <span style={{fontSize:10,color:"#06b6d4",whiteSpace:"nowrap",padding:"4px 8px",background:"rgba(6,182,212,0.08)",borderRadius:6}}>Σ {fE(subOrcTotal)}</span>
+                            : <input type="number" defaultValue={orcMes[cat]||""} placeholder="0" onClick={e=>e.stopPropagation()}
+                                style={{width:70,textAlign:"right",padding:"4px 8px",fontSize:12}}
+                                onBlur={e=>{const v=parseFloat(e.target.value)||0;setOrcs(prev=>({...prev,[mesKey]:{...(prev[mesKey]||{}),[cat]:v}}));}}/>
                         ):<span style={{fontSize:10,color:th.textLow,whiteSpace:"nowrap"}}>/{fE(orc)}</span>}
                       </div>
                       {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:th.textLow}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":th.textLow}}>{over?`+${fE(net-orc)} acima`:`${fE(orc-net)} livre`}</span></div></>})()}
@@ -3031,9 +3142,9 @@ export default function App(){
                             const subPct=subOrc>0?val/subOrc*100:0;
                             const subOver=subOrc>0&&val>subOrc;
                             const subColor=subOver?"#ef4444":subPct>=75?"#f59e0b":"#22c55e";
-                            // If no sub budget, show proportional bar vs category total
+                            // Bar: semáforo se há orçamento, proporção da categoria se não há
                             const barMax = subOrc>0 ? subOrc : net;
-                            const barColor = subOrc>0 ? subColor : cats[cat]?.color||"#3b82f6";
+                            const barColor = subOrc>0 ? subColor : "#22c55e";
                             return(
                               <div key={sub} style={{padding:"4px 0 4px 30px",cursor:"pointer"}}
                                 onClick={e=>{e.stopPropagation();setCatModal(cat+"::"+sub);}}>
