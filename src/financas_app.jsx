@@ -510,20 +510,7 @@ function PieChart({data,size=160}){
   );
 }
 
-// ── MODAL ─────────────────────────────────────────────────────
-function Modal({children,onClose}){
-  return(
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div/>
-          <button onClick={onClose} style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",padding:"4px 12px",border:"1px solid #1e3048",fontSize:18,lineHeight:1}}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
+
 
 export default function App(){
   const isMobile=useIsMobile();
