@@ -943,7 +943,17 @@ export default function App(){
 
   const mesKey=`${fAno}-${String(fMes+1).padStart(2,"0")}`;
   const orcMes=orcs[mesKey]||{};
-  const totalOrçamentado=Object.values(orcMes).reduce((a,b)=>a+b,0);
+  // totalOrçamentado: para cada categoria usa Σ subcategorias se existirem, senão valor directo
+  // Evita duplicação de cat + subcat
+  const totalOrçamentado=Object.keys(cats)
+    .filter(cat=>!["Transferência Interna","Receita","Poupança"].includes(cat))
+    .reduce((total,cat)=>{
+      const subTotal=Object.keys(orcMes)
+        .filter(k=>k.startsWith(cat+"::"))
+        .reduce((a,k)=>a+orcMes[k],0);
+      const catVal=subTotal>0?subTotal:(orcMes[cat]||0);
+      return total+catVal;
+    },0);
   const [dismissedAlertsArr,setDismissedAlertsArr]=useLS("fin_dismissed_"+mesKey,[]);
   const dismissedAlerts=useMemo(()=>new Set(dismissedAlertsArr),[dismissedAlertsArr]);
   const dismissAlert=useCallback(cat=>{
@@ -1464,9 +1474,10 @@ export default function App(){
     }));
 
     return (
+      <ThemeCtx.Provider value={th}>
       <>
         <style>{CSS}</style>
-        <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
+        <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0,background:th.bg,color:th.text}}>
           {/* Header */}
           <div style={{background:th.bgAlt,borderBottom:`1px solid ${th.border}`,padding:`12px ${px}`,display:"flex",alignItems:"center",gap:8,position:"sticky",top:0,zIndex:50,flexWrap:"wrap"}}>
             <button onClick={()=>setScreen("landing")} style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,padding:"6px 12px",border:`1px solid ${th.border}`,fontSize:12,borderRadius:8}}>← Hub</button>
@@ -1909,10 +1920,13 @@ export default function App(){
 
 
           {isMobile&&<div className="tabbar">
-            <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
+            <button onClick={()=>setScreen("landing")} style={{color:th.textLow,flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none",fontSize:10}}><span style={{fontSize:18}}>🏠</span>Hub</button>
+            <button onClick={()=>{setEmpTab("mensal");}} className={empTab==="mensal"?"act":""} style={{flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none",fontSize:10}}><span style={{fontSize:18}}>📅</span>Mensal</button>
+            <button onClick={()=>{setEmpTab("anual");}} className={empTab==="anual"?"act":""} style={{flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none",fontSize:10}}><span style={{fontSize:18}}>📊</span>Anual</button>
           </div>}
         </div>
       </>
+      </ThemeCtx.Provider>
     );
   }
 
