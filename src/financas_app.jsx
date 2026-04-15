@@ -522,22 +522,28 @@ function PieChart({data,size=160}){
 function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
   const [capital, setCapital] = React.useState(Math.round(autoCapital));
   const [mensal, setMensal] = React.useState(autoMensal);
+  const [mensal2, setMensal2] = React.useState(1200);
+  const [fase2Ano, setFase2Ano] = React.useState(0.75); // ~9 meses = Nov 2026 aprox
   const [despMensal, setDespMensal] = React.useState(3500);
   const [lf, setLf] = React.useState(500000);
-  const [fire, setFire] = React.useState(()=>Math.round(despMensal*12/0.04));
+  const [fire, setFire] = React.useState(()=>Math.round(3500*12/0.04));
   const [selYr, setSelYr] = React.useState(20);
   const [tooltip, setTooltip] = React.useState(null);
 
-  // Recalculate FIRE when despMensal changes (4% rule)
   const apply4pct = () => setFire(Math.round(despMensal * 12 / 0.04));
 
   const projYears = 40;
   const rates = {r5:5/100/12, r8:8/100/12, r10:10/100/12};
+  // Projecção faseada: Fase 1 (mensal) até fase2Ano, depois Fase 2 (mensal2)
   const buildP = (rate) => {
     const pts=[]; let c=capital;
+    const fase2Month = Math.round(fase2Ano * 12);
     for(let i=0;i<=projYears*12;i+=12){
       pts.push({yr:i/12, val:Math.round(c)});
-      for(let m=0;m<12;m++) c=c*(1+rate)+mensal;
+      for(let m=0;m<12;m++){
+        const contrib = (i+m) >= fase2Month ? mensal2 : mensal;
+        c=c*(1+rate)+contrib;
+      }
     }
     return pts;
   };
@@ -595,7 +601,7 @@ function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
           </div>
         </div>
         <div>
-          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Contribuição mensal (€)</span>
+          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Contribuição mensal — Fase 1 (€)</span>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             <input type="number" value={mensal} step="10"
               onChange={e=>setMensal(parseFloat(e.target.value)||0)}
@@ -605,6 +611,20 @@ function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
               ↺ auto
             </button>
           </div>
+        </div>
+        <div>
+          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Contribuição Fase 2 (€) · a partir de</span>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input type="number" value={mensal2} step="100"
+              onChange={e=>setMensal2(parseFloat(e.target.value)||0)}
+              style={{fontSize:13,flex:1}}/>
+            <span style={{fontSize:10,color:th.textLow,flexShrink:0}}>após</span>
+            <input type="number" value={fase2Ano} step="0.5" min="0" max="40"
+              onChange={e=>setFase2Ano(parseFloat(e.target.value)||0)}
+              style={{fontSize:13,width:60}}/>
+            <span style={{fontSize:10,color:th.textLow,flexShrink:0}}>anos</span>
+          </div>
+          <p style={{fontSize:9,color:th.textLow,marginTop:2}}>Ex: 1.200€/mês após atingir Nível 4 (~{new Date().getFullYear()+Math.round(fase2Ano)})</p>
         </div>
         <div>
           <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Objectivo LF (€)</span>
@@ -740,6 +760,11 @@ function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
             </div>
           ))}
           <p style={{fontSize:8,color:th.textLow,marginTop:6,textAlign:"center"}}>clica no eixo X</p>
+          <div style={{marginTop:8,padding:"6px",background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:6}}>
+            <p style={{fontSize:8,color:th.textLow,marginBottom:2}}>Fase 1: {fmtV(mensal)}/mês</p>
+            <p style={{fontSize:8,color:"#06b6d4"}}>Fase 2: {fmtV(mensal2)}/mês</p>
+            <p style={{fontSize:8,color:th.textLow}}>a partir de {fase2Ano}a</p>
+          </div>
         </div>
       </div>
       {/* Legenda */}
@@ -1212,7 +1237,7 @@ export default function App(){
 
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:480,marginBottom:24}}>
-          <div onClick={()=>setScreen("gestao")} style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
+          <div onClick={()=>setScreen("gestao")} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:18,padding:20,cursor:"pointer",transition:"all 0.2s"}}
             onMouseEnter={e=>{e.currentTarget.style.borderColor="#3b82f6";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=th.border;}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
               <div style={{fontSize:24,width:44,height:44,background:"rgba(59,130,246,0.12)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>💳</div>
@@ -1284,7 +1309,7 @@ export default function App(){
             })()}
           </div>
 
-          <div style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:12,padding:"12px 16px",textAlign:"center",marginBottom:10}}>
+          <div style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:12,padding:"12px 16px",textAlign:"center",marginBottom:10}}>
             <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:2,marginBottom:4}}>Património Total em Contas</p>
             <p style={{fontSize:26,fontWeight:600,color:th.text}}>{fE(patrimonioTotal)}</p>
             <p style={{fontSize:10,color:th.textLow,marginTop:3}}>Millennium + Caixinhas + Investimentos</p>
@@ -1295,248 +1320,17 @@ export default function App(){
           </div>
         </div>
       </div>
-    </>
-  );
-
-  // ── PATRIMONIO ───────────────────────────────────────────────
-  if(screen==="patrimonio") return (
-    <>
-      <style>{CSS}</style>
-      <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
-        <div style={{background:th.bgAlt,borderBottom:`1px solid ${th.border}`,padding:`12px ${px}`,display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
-          <button onClick={()=>setScreen("landing")} style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,padding:"6px 12px",border:"1px solid ${${th.border}}",fontSize:12,borderRadius:8}}>← Hub</button>
-          <p style={{fontSize:15,fontWeight:600,color:th.text}}>💎 Património Líquido</p>
-        </div>
-
-        <div style={{padding:mainPad,maxWidth:isMobile?undefined:960,margin:"0 auto"}} className="fade">
-
-          {/* Summary KPIs — latest snapshot */}
-          {(()=>{
-            const latest = patSnaps[patSnaps.length-1];
-            const prev = patSnaps[patSnaps.length-2];
-            if(!latest) return <Card style={{textAlign:"center",padding:"2rem"}}><p style={{color:th.textLow}}>Ainda sem dados. Regista o primeiro mês abaixo.</p></Card>;
-            const totalAtivos = Object.values(latest.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
-            const totalPassivos = Object.values(latest.passivos||{}).reduce((a,v)=>a+v,0);
-            const patLiq = totalAtivos - totalPassivos;
-            const prevPat = prev ? Object.values(prev.ativos||{}).reduce((a,v)=>a+(v.valor||0),0) - Object.values(prev.passivos||{}).reduce((a,v)=>a+v,0) : null;
-            const diff = prevPat!==null ? patLiq-prevPat : null;
-            const pct = prevPat ? ((patLiq-prevPat)/Math.abs(prevPat)*100) : null;
-            return(
-              <div style={{marginBottom:16}}>
-                <p style={{fontSize:13,color:th.textLow,marginBottom:10}}>{latest.mes} · último registo</p>
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:10}}>
-                  {[
-                    {label:"Total Ativos",val:totalAtivos,color:"#22c55e"},
-                    {label:"Total Passivos",val:totalPassivos,color:"#ef4444"},
-                    {label:"Património Líquido",val:patLiq,color:"#3b82f6"},
-                    {label:"Variação vs mês ant.",val:diff,color:diff>=0?"#22c55e":"#ef4444",isPct:true,pct},
-                  ].map(k=>(
-                    <div key={k.label} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:14,padding:"14px"}}>
-                      <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
-                      {k.val!==null
-                        ? <p style={{fontSize:18,fontWeight:700,color:k.color}}>{k.val>=0?"+":""}{fE(k.val)}</p>
-                        : <p style={{fontSize:14,color:th.textLow}}>—</p>}
-                      {k.isPct&&k.pct!==null&&<p style={{fontSize:11,color:k.color,marginTop:2}}>{k.pct>=0?"+":""}{k.pct.toFixed(1)}%</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-          );
-        })()}
-
-          {/* Historical evolution */}
-          {patSnaps.length>1&&(
-            <Card>
-              <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>Evolução mensal</p>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:500}}>
-                  <thead>
-                    <tr style={{borderBottom:`1px solid ${th.border}`}}>
-                      {["Mês","Ativos","Passivos","Património Líquido","Variação","Variação %"].map(h=>(
-                        <th key={h} style={{textAlign:"left",padding:"6px 10px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...patSnaps].reverse().map((s,i,arr)=>{
-                      const totalA=Object.values(s.ativos||{}).reduce((a,v)=>a+(v.valor||0),0);
-                      const totalP=Object.values(s.passivos||{}).reduce((a,v)=>a+v,0);
-                      const pat=totalA-totalP;
-                      const prevS=arr[i+1];
-                      const prevPat=prevS?Object.values(prevS.ativos||{}).reduce((a,v)=>a+(v.valor||0),0)-Object.values(prevS.passivos||{}).reduce((a,v)=>a+v,0):null;
-                      const diff=prevPat!==null?pat-prevPat:null;
-                      const pct=prevPat?((pat-prevPat)/Math.abs(prevPat)*100):null;
-                      return(
-                        <tr key={s.mes} className="hrow" style={{borderBottom:"1px solid #0a1220",transition:"background 0.1s"}}>
-                          <td style={{padding:"10px",color:"#f59e0b",fontWeight:600}}>{s.mes}</td>
-                          <td style={{padding:"10px",color:"#22c55e"}}>{fE(totalA)}</td>
-                          <td style={{padding:"10px",color:"#ef4444"}}>{fE(totalP)}</td>
-                          <td style={{padding:"10px",fontWeight:700,color:"#3b82f6"}}>{fE(pat)}</td>
-                          <td style={{padding:"10px",color:diff===null?th.textLow:diff>=0?"#22c55e":"#ef4444"}}>{diff===null?"—":`${diff>=0?"+":""}${fE(diff)}`}</td>
-                          <td style={{padding:"10px",color:pct===null?th.textLow:pct>=0?"#22c55e":"#ef4444"}}>{pct===null?"—":`${pct>=0?"+":""}${pct.toFixed(1)}%`}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
-
-          {/* Register / Edit month */}
-          <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <p style={{fontSize:14,fontWeight:600,color:th.text}}>Registar mês</p>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <input type="month" value={patEdit||new Date().toISOString().slice(0,7)}
-                  onChange={e=>{
-                    setPatEdit(e.target.value);
-                    const existing=patSnaps.find(s=>s.mes===e.target.value);
-                    if(existing) setPatDraft({ativos:{...existing.ativos},passivos:{...existing.passivos},empresa:{...existing.empresa||{}}});
-                    else setPatDraft({ativos:{},passivos:{},empresa:{}});
-                  }}
-                  style={{fontSize:12,padding:"6px 10px",width:"auto"}}/>
-              </div>
-            </div>
-
-            {/* ATIVOS */}
-            <p style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Ativos</p>
-            {GRUPOS_ATIVOS.map(grupo=>(
-              <div key={grupo.id} style={{marginBottom:14}}>
-                <p style={{fontSize:11,color:th.textLow,marginBottom:8,display:"flex",alignItems:"center",gap:6}}><span>{grupo.icon}</span>{grupo.label}</p>
-                {PATRIMONIO_ATIVOS.filter(a=>a.grupo===grupo.id).map(item=>{
-                  const d=patDraft.ativos[item.id]||{valor:"",investido:""};
-                  return(
-                    <div key={item.id} style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:darkMode?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.02)",borderRadius:10,borderLeft:`3px solid ${item.color}44`}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:16}}>{item.icon}</span>
-                        <span style={{fontSize:13,color:th.text}}>{item.label}</span>
-                      </div>
-                      <div>
-                        <Lbl>Valor atual (€)</Lbl>
-                        <input type="number" value={d.valor} placeholder="0"
-                          onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,valor:parseFloat(e.target.value)||""}}}))
-                          } style={{fontSize:13}}/>
-                      </div>
-                      {!item.fixo&&(
-                        <div>
-                          <Lbl>Total investido (€)</Lbl>
-                          <input type="number" value={d.investido} placeholder="0"
-                            onChange={e=>setPatDraft(p=>({...p,ativos:{...p.ativos,[item.id]:{...d,investido:parseFloat(e.target.value)||""}}}))}
-                            style={{fontSize:13}}/>
-                        </div>
-                      )}
-                      {!item.fixo&&d.valor&&d.investido&&(
-                        <div style={{gridColumn:isMobile?"1":"3",display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}>
-                          {(()=>{const ganho=(d.valor||0)-(d.investido||0);const pct=d.investido?ganho/d.investido*100:0;return(
-                            <span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE(Math.abs(ganho))} ({pct>=0?"+":""}{pct.toFixed(1)}%)</span>
-                          );})()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-
-            {/* PASSIVOS */}
-            <p style={{fontSize:12,fontWeight:600,color:"#ef4444",marginBottom:10,textTransform:"uppercase",letterSpacing:1,marginTop:8}}>Passivos</p>
-            {PATRIMONIO_PASSIVOS.map(item=>{
-              const val=patDraft.passivos[item.id]||"";
-              return(
-                <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(239,68,68,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:16}}>{item.icon}</span>
-                    <span style={{fontSize:13,color:th.text}}>{item.label}</span>
-                  </div>
-                  <div>
-                    <Lbl>Capital em dívida (€)</Lbl>
-                    <input type="number" value={val} placeholder="0"
-                      onChange={e=>setPatDraft(p=>({...p,passivos:{...p.passivos,[item.id]:parseFloat(e.target.value)||""}}))}
-                      style={{fontSize:13}}/>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* EMPRESA */}
-            <p style={{fontSize:12,fontWeight:600,color:"#f59e0b",marginBottom:10,textTransform:"uppercase",letterSpacing:1,marginTop:8}}>Empresa (Linguagem Entusiasta)</p>
-            {EMPRESA_ITEMS.map(item=>{
-              const val=patDraft.empresa[item.id]||"";
-              return(
-                <div key={item.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8,padding:"10px 12px",background:"rgba(245,158,11,0.03)",borderRadius:10,borderLeft:`3px solid ${item.color}44`,alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:16}}>{item.icon}</span>
-                    <span style={{fontSize:13,color:th.text}}>{item.label}</span>
-                  </div>
-                  <div>
-                    <Lbl>Valor (€)</Lbl>
-                    <input type="number" value={val} placeholder="0"
-                      onChange={e=>setPatDraft(p=>({...p,empresa:{...p.empresa,[item.id]:parseFloat(e.target.value)||""}}))}
-                      style={{fontSize:13}}/>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Save button */}
-            <button onClick={()=>{
-              const mes=patEdit||new Date().toISOString().slice(0,7);
-              const snap={mes,ativos:patDraft.ativos,passivos:patDraft.passivos,empresa:patDraft.empresa};
-              setPatSnaps(prev=>{const filtered=prev.filter(s=>s.mes!==mes);return[...filtered,snap].sort((a,b)=>a.mes.localeCompare(b.mes));});
-              setPatDraft({ativos:{},passivos:{},empresa:{}});
-            }} style={{width:"100%",background:"#22c55e",color:th.text,border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,marginTop:16,cursor:"pointer"}}>
-              ✓ Guardar {patEdit||new Date().toISOString().slice(0,7)}
-            </button>
-          </Card>
-
-          {/* Investments detail — valor investido vs atual */}
-          {patSnaps.length>0&&(()=>{
-            const latest=patSnaps[patSnaps.length-1];
-            const invItems=PATRIMONIO_ATIVOS.filter(a=>a.grupo==="investimento");
-            const hasData=invItems.some(a=>latest.ativos?.[a.id]?.valor);
-            if(!hasData) return null;
-            return(
-              <Card>
-                <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:14}}>📈 Detalhe de Investimentos — {latest.mes}</p>
-                {invItems.map(item=>{
-                  const d=latest.ativos?.[item.id];
-                  if(!d?.valor) return null;
-                  const ganho=(d.valor||0)-(d.investido||0);
-                  const pct=d.investido?ganho/d.investido*100:null;
-                  return(
-                    <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #0d1a2e"}}>
-                      <span style={{fontSize:18,width:28}}>{item.icon}</span>
-                      <div style={{flex:1}}>
-                        <p style={{fontSize:13,fontWeight:500,marginBottom:3}}>{item.label}</p>
-                        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                          {d.investido&&<span style={{fontSize:11,color:th.textLow}}>Investido: {fE(d.investido)}</span>}
-                          <span style={{fontSize:11,color:th.text}}>Atual: {fE(d.valor)}</span>
-                          {d.investido&&<span style={{fontSize:11,color:ganho>=0?"#22c55e":"#ef4444",fontWeight:600}}>{ganho>=0?"↑":"↓"} {fE(Math.abs(ganho))} {pct!==null?`(${pct>=0?"+":""}${pct.toFixed(1)}%)`:""}</span>}
-                        </div>
-                        {d.investido&&<PBar val={d.valor} max={Math.max(d.valor,d.investido)} color={ganho>=0?"#22c55e":"#ef4444"}/>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </Card>
-            );
-          })()}
-
-        </div>
-
-        {isMobile&&<div className="tabbar">
-          <button onClick={()=>setScreen("landing")}><span style={{fontSize:18}}>🏠</span>Hub</button>
-          <button onClick={()=>{setScreen("gestao");setTab("dashboard");}}><span style={{fontSize:18}}>💳</span>Gestão</button>
-          <button onClick={()=>setScreen("plano")}><span style={{fontSize:18}}>🎯</span>Plano</button>
-        </div>}
-      </div>
+      {isMobile&&<div className="tabbar">
+        <button onClick={()=>setScreen("landing")} style={{color:th.textLow,flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none",fontSize:10}}><span style={{fontSize:18}}>🏠</span>Hub</button>
+        <button onClick={()=>{setScreen("gestao");setTab("dashboard");}} style={{color:th.textLow,flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none",fontSize:10}}><span style={{fontSize:18}}>💳</span>Gestão</button>
+        <button onClick={()=>setScreen("plano")} style={{color:th.textLow,flexDirection:"column",display:"flex",alignItems:"center",gap:2,padding:"10px 2px",background:"none",border:"none",fontSize:10}}><span style={{fontSize:18}}>🎯</span>Plano</button>
+      </div>}
     </>
     </ThemeCtx.Provider>
   );
 
 
-  // ── EMPRESA ───────────────────────────────────────────────────
+    // ── EMPRESA ───────────────────────────────────────────────────
   if(screen==="empresa") {
     const hoje = new Date();
     const empMesKey = `${fAno}-${String(fMes+1).padStart(2,"0")}`;
@@ -1629,8 +1423,8 @@ export default function App(){
         <style>{CSS}</style>
         <div style={{minHeight:"100vh",paddingBottom:isMobile?80:0}}>
           {/* Header */}
-          <div style={{background:th.bgAlt,borderBottom:"1px solid ${${th.border}}",padding:`12px ${px}`,display:"flex",alignItems:"center",gap:8,position:"sticky",top:0,zIndex:50,flexWrap:"wrap"}}>
-            <button onClick={()=>setScreen("landing")} style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,padding:"6px 12px",border:"1px solid ${${th.border}}",fontSize:12,borderRadius:8}}>← Hub</button>
+          <div style={{background:th.bgAlt,borderBottom:`1px solid ${th.border}`,padding:`12px ${px}`,display:"flex",alignItems:"center",gap:8,position:"sticky",top:0,zIndex:50,flexWrap:"wrap"}}>
+            <button onClick={()=>setScreen("landing")} style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,padding:"6px 12px",border:`1px solid ${th.border}`,fontSize:12,borderRadius:8}}>← Hub</button>
             <p style={{fontSize:15,fontWeight:600,color:th.text}}>🏢 Linguagem Entusiasta</p>
             {/* Tabs */}
             <div style={{display:"flex",gap:0,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:10,padding:3,marginLeft:"auto"}}>
@@ -1880,7 +1674,7 @@ export default function App(){
                 })}
 
                 {despVar.length>0&&(
-                  <div style={{marginTop:10,borderTop:"1px solid ${${th.border}}",paddingTop:10}}>
+                  <div style={{marginTop:10,borderTop:`1px solid ${th.border}`,paddingTop:10}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                       <span style={{fontSize:12,color:th.textLow}}>Total despesas variáveis</span>
                       <span style={{fontSize:13,fontWeight:600,color:"#ef4444"}}>{fE(totalDespVar)}</span>
@@ -1941,7 +1735,7 @@ export default function App(){
                       <span style={{fontSize:11,color:th.textLow}}>Tributações autónomas</span>
                       <span style={{fontSize:12,fontWeight:600,color:"#f59e0b"}}>{fE(totalTAAnual)}</span>
                     </div>
-                    <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid ${${th.border}}",paddingTop:4,marginTop:2}}>
+                    <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${th.border}`,paddingTop:4,marginTop:2}}>
                       <span style={{fontSize:11,fontWeight:600,color:th.text}}>Total fiscal</span>
                       <span style={{fontSize:13,fontWeight:700,color:"#a855f7"}}>{totalRes>0?fE(totalRes*0.17+totalTAAnual):fE(totalTAAnual)}</span>
                     </div>
@@ -2486,7 +2280,7 @@ export default function App(){
                     {label:"Património Líquido",val:pat,color:"#a855f7"},
                     {label:"Variação mensal",val:diff,color:diff===null?null:diff>=0?"#22c55e":"#ef4444",pct,isVar:true},
                   ].map(k=>(
-                    <div key={k.label} style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:14,padding:"14px"}}>
+                    <div key={k.label} style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:14,padding:"14px"}}>
                       <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{k.label}</p>
                       {k.val!==null&&k.val!==undefined
                         ?<p style={{fontSize:18,fontWeight:700,color:k.color||th.text}}>{k.isVar&&k.val>=0?"+":""}{fE(k.val)}</p>
@@ -2562,7 +2356,7 @@ export default function App(){
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:480}}>
                       <thead>
-                        <tr style={{borderBottom:"1px solid ${${th.border}}"}}>
+                        <tr style={{borderBottom:`1px solid ${th.border}`}}>
                           {["Mês","Ativos","Passivos","Pat. Líquido","Variação","Var %"].map(h=>(
                             <th key={h} style={{textAlign:"left",padding:"6px 8px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1}}>{h}</th>
                           ))}
@@ -2894,7 +2688,7 @@ export default function App(){
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead>
                   <tr style={{background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)"}}>
-                    <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid ${${th.border}}",width:"45%"}}>Rubrica</th>
+                    <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"45%"}}>Rubrica</th>
                     <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"25%"}}>Valor atual (€)</th>
                     <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"20%"}}>Investido (€)</th>
                     <th style={{textAlign:"right",padding:"8px 12px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,borderBottom:`1px solid ${th.border}`,width:"10%"}}>+/-</th>
@@ -3046,7 +2840,7 @@ export default function App(){
         {/* Desktop sidebar */}
         {!isMobile&&(
           <div style={{width:210,background:th.bgAlt,borderRight:`1px solid ${th.border}`,display:"flex",flexDirection:"column",padding:"16px 0",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto"}}>
-            <div style={{padding:"0 16px 14px",borderBottom:"1px solid ${${th.border}}",marginBottom:10}}>
+            <div style={{padding:"0 16px 14px",borderBottom:`1px solid ${th.border}`,marginBottom:10}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                 <button onClick={()=>setScreen("landing")} style={{background:"none",color:th.textLow,padding:"3px 0",border:"none",fontSize:11,cursor:"pointer"}}>← Hub</button>
                 <ThemeToggle/>
@@ -3080,7 +2874,7 @@ export default function App(){
                 )}
               </div>
             </div>
-            <div style={{display:"flex",gap:4,padding:"6px 10px 10px",borderBottom:"1px solid ${${th.border}}",marginBottom:6}}>
+            <div style={{display:"flex",gap:4,padding:"6px 10px 10px",borderBottom:`1px solid ${th.border}`,marginBottom:6}}>
               <select value={fMes} onChange={e=>setFMes(parseInt(e.target.value))} style={{flex:1,fontSize:12,padding:"5px 6px"}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
               <select value={fAno} onChange={e=>setFAno(parseInt(e.target.value))} style={{width:62,fontSize:12,padding:"5px 6px"}}>{[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
             </div>
@@ -3491,7 +3285,7 @@ export default function App(){
                   {addManual?"✕ Fechar":"＋ Adicionar movimento manual"}
                 </button>
                 {addManual&&(
-                  <div style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:14,padding:16}}>
+                  <div style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:14,padding:16}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                       <div><Lbl>Data</Lbl><input type="date" value={manualT.data} onChange={e=>setManualT(t=>({...t,data:e.target.value}))}/></div>
                       <div><Lbl>Tipo</Lbl>
@@ -3696,7 +3490,7 @@ export default function App(){
                 </div>
               )}
               {/* Lista compacta — novo layout centrado */}
-              <div style={{background:th.bgCard,border:"1px solid ${${th.border}}",borderRadius:16,overflow:"hidden"}}>
+              <div style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:16,overflow:"hidden"}}>
                 {/* Header */}
                 <div style={{display:"grid",gridTemplateColumns:"90px 1fr 200px 170px 90px 32px",gap:8,padding:"10px 16px",borderBottom:`1px solid ${th.border}`,background:th.bgAlt}}>
                   {["Data","Descrição","Categoria","Subcategoria","Valor",""].map((h,i)=>(
@@ -3767,7 +3561,7 @@ export default function App(){
                       </div>
                       {/* Expanded detail */}
                       {isExpanded&&(
-                        <div style={{padding:"12px 14px",background:th.bg,borderTop:"1px solid ${${th.border}}"}}>
+                        <div style={{padding:"12px 14px",background:th.bg,borderTop:`1px solid ${th.border}`}}>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                             <div><Lbl>Data</Lbl><input type="date" defaultValue={t.data} onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],data:e.target.value}}))} /></div>
                             <div><Lbl>Entidade</Lbl><input type="text" defaultValue={entA} placeholder="Ex: Continente" onChange={e=>setPEd(p=>({...p,[t.id]:{...p[t.id],ent:e.target.value}}))} /></div>
@@ -3862,7 +3656,7 @@ export default function App(){
                 </div>
                 {/* Show current snapshots */}
                 {contas.filter(c=>c.saldoRef!=null).length>0&&(
-                  <div style={{marginTop:12,borderTop:"1px solid ${${th.border}}",paddingTop:10}}>
+                  <div style={{marginTop:12,borderTop:`1px solid ${th.border}`,paddingTop:10}}>
                     <p style={{fontSize:10,color:th.textLow,marginBottom:6}}>SALDOS DE REFERÊNCIA</p>
                     {contas.filter(c=>c.saldoRef!=null).map(c=>(
                       <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0"}}>
@@ -3928,7 +3722,7 @@ export default function App(){
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   <Btn onClick={exportJSON} style={{fontSize:12}}>↓ Exportar backup JSON</Btn>
                   <Btn onClick={exportExcel} style={{fontSize:12,background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.2)"}}>↓ Exportar Excel/CSV</Btn>
-                  <label style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,border:"1px solid ${${th.border}}",borderRadius:10,padding:"8px 14px",fontSize:12,cursor:"pointer"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
+                  <label style={{background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,color:th.textMid,border:`1px solid ${th.border}`,borderRadius:10,padding:"8px 14px",fontSize:12,cursor:"pointer"}}>↑ Importar backup<input type="file" accept=".json" style={{display:"none"}} onChange={e=>importJSON(e.target.files[0])}/></label>
                   <Btn variant="danger" style={{fontSize:12}} onClick={()=>{if(confirm("Apagar todas as transações?")){setTrans([]);setPend([]);}}}>Apagar</Btn>
                 </div>
               </Card>
