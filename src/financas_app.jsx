@@ -517,6 +517,245 @@ function PieChart({data,size=160}){
 
 
 
+
+// ── FIRE SIMULATOR CARD ───────────────────────────────────────────
+function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
+  const [capital, setCapital] = React.useState(Math.round(autoCapital));
+  const [mensal, setMensal] = React.useState(autoMensal);
+  const [despMensal, setDespMensal] = React.useState(3500);
+  const [lf, setLf] = React.useState(500000);
+  const [fire, setFire] = React.useState(()=>Math.round(despMensal*12/0.04));
+  const [selYr, setSelYr] = React.useState(20);
+  const [tooltip, setTooltip] = React.useState(null);
+
+  // Recalculate FIRE when despMensal changes (4% rule)
+  const apply4pct = () => setFire(Math.round(despMensal * 12 / 0.04));
+
+  const projYears = 40;
+  const rates = {r5:5/100/12, r8:8/100/12, r10:10/100/12};
+  const buildP = (rate) => {
+    const pts=[]; let c=capital;
+    for(let i=0;i<=projYears*12;i+=12){
+      pts.push({yr:i/12, val:Math.round(c)});
+      for(let m=0;m<12;m++) c=c*(1+rate)+mensal;
+    }
+    return pts;
+  };
+  const p5=buildP(rates.r5), p8=buildP(rates.r8), p10=buildP(rates.r10);
+
+  // Find when each scenario reaches LF and FIRE
+  const whenReach=(pts,target)=>{
+    const pt=pts.find(p=>p.val>=target);
+    return pt?pt.yr:null;
+  };
+  const fmtWhen=(yr)=>{
+    if(yr===null) return "Não atingido";
+    const anoReal = new Date().getFullYear() + yr;
+    return `${yr}a (${anoReal})`;
+  };
+
+  const maxV = Math.max(...p10.map(p=>p.val), fire, lf, 1);
+  const IPL=52,IPR=12,IPT=20,IPB=24,IW=600,IH=180;
+  const innerIW=IW-IPL-IPR, innerIH=IH-IPT-IPB;
+  const toIX=yr=>IPL+(yr/projYears)*innerIW;
+  const toIY=v=>IPT+innerIH-((v/maxV)*innerIH);
+  const xTicks=[0,5,10,15,20,25,30,35,40];
+  const fmtAxis=v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?(v/1000).toFixed(0)+"k":"0";
+
+  const selVals={v5:p5.find(p=>p.yr===selYr)?.val??0, v8:p8.find(p=>p.yr===selYr)?.val??0, v10:p10.find(p=>p.yr===selYr)?.val??0};
+  const lines=[
+    {pts:p5,color:"#94a3b8",label:"5%"},
+    {pts:p8,color:"#06b6d4",label:"8%"},
+    {pts:p10,color:"#f59e0b",label:"10%"},
+  ];
+
+  return(
+    <ThemeCtx.Consumer>{()=>(
+    <div style={{background:th.bgCard,border:`1px solid ${th.border}`,borderRadius:16,padding:16,marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+        <span style={{fontSize:20}}>🔥</span>
+        <div>
+          <p style={{fontSize:14,fontWeight:700,color:th.text}}>Simulador FIRE — Liberdade Financeira</p>
+          <p style={{fontSize:10,color:th.textLow}}>Baseado em todos os investimentos excl. PPR Lexie</p>
+        </div>
+      </div>
+
+      {/* Inputs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
+        <div>
+          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Capital inicial (€)</span>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input type="number" value={capital} step="100"
+              onChange={e=>setCapital(parseFloat(e.target.value)||0)}
+              style={{fontSize:13,flex:1}}/>
+            <button onClick={()=>setCapital(Math.round(autoCapital))}
+              style={{background:"rgba(6,182,212,0.1)",color:"#06b6d4",border:`1px solid rgba(6,182,212,0.3)`,borderRadius:8,padding:"6px 10px",fontSize:11,whiteSpace:"nowrap"}}>
+              ↺ auto
+            </button>
+          </div>
+        </div>
+        <div>
+          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Contribuição mensal (€)</span>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input type="number" value={mensal} step="10"
+              onChange={e=>setMensal(parseFloat(e.target.value)||0)}
+              style={{fontSize:13,flex:1}}/>
+            <button onClick={()=>setMensal(autoMensal)}
+              style={{background:"rgba(6,182,212,0.1)",color:"#06b6d4",border:`1px solid rgba(6,182,212,0.3)`,borderRadius:8,padding:"6px 10px",fontSize:11,whiteSpace:"nowrap"}}>
+              ↺ auto
+            </button>
+          </div>
+        </div>
+        <div>
+          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Objectivo LF (€)</span>
+          <input type="number" value={lf} step="10000"
+            onChange={e=>setLf(parseFloat(e.target.value)||0)}
+            style={{fontSize:13}}/>
+        </div>
+        <div>
+          <span style={{fontSize:10,color:th.textLow,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Objectivo FIRE (€)</span>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input type="number" value={fire} step="10000"
+              onChange={e=>setFire(parseFloat(e.target.value)||0)}
+              style={{fontSize:13,flex:1}}/>
+            <div style={{display:"flex",gap:4,alignItems:"center"}}>
+              <input type="number" value={despMensal} step="100" title="Despesas mensais"
+                onChange={e=>setDespMensal(parseFloat(e.target.value)||0)}
+                style={{fontSize:11,width:72,padding:"6px 8px"}} placeholder="Desp/mês"/>
+              <button onClick={apply4pct}
+                style={{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:`1px solid rgba(239,68,68,0.3)`,borderRadius:8,padding:"6px 10px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>
+                4%
+              </button>
+            </div>
+          </div>
+          <p style={{fontSize:9,color:th.textLow,marginTop:3}}>Regra dos 4%: {fE(despMensal*12)} anuais → FIRE = {fE(despMensal*12/0.04)}</p>
+        </div>
+      </div>
+
+      {/* Quando atinge */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+        {lines.map(({color,label})=>{
+          const pts=label==="5%"?p5:label==="8%"?p8:p10;
+          const yrLF=whenReach(pts,lf);
+          const yrFIRE=whenReach(pts,fire);
+          return(
+            <div key={label} style={{background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,padding:"10px 12px",border:`1px solid ${color}33`}}>
+              <p style={{fontSize:11,fontWeight:700,color,marginBottom:6}}>Cenário {label}</p>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <div>
+                  <p style={{fontSize:9,color:th.textLow}}>🌅 LF {fE(lf)}</p>
+                  <p style={{fontSize:12,fontWeight:600,color:yrLF?color:th.textLow2}}>{fmtWhen(yrLF)}</p>
+                </div>
+                <div>
+                  <p style={{fontSize:9,color:th.textLow}}>🔥 FIRE {fE(fire)}</p>
+                  <p style={{fontSize:12,fontWeight:600,color:yrFIRE?color:th.textLow2}}>{fmtWhen(yrFIRE)}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Gráfico */}
+      <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <svg viewBox={`0 0 ${IW} ${IH}`} width="100%" height={IH} style={{overflow:"visible",cursor:"crosshair"}}
+            onMouseLeave={()=>setTooltip(null)}>
+            {/* Y grid */}
+            {[0,0.25,0.5,0.75,1].map((p,i)=>{
+              const v=maxV*p;
+              return(<g key={i}>
+                <line x1={IPL} y1={toIY(v)} x2={IW-IPR} y2={toIY(v)} stroke={th.border} strokeWidth="1" strokeDasharray="3,3"/>
+                <text x={IPL-4} y={toIY(v)+4} textAnchor="end" fill={th.textLow} fontSize="9">{fmtAxis(v)}</text>
+              </g>);
+            })}
+            {/* Eixos */}
+            <line x1={IPL} y1={IPT} x2={IPL} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
+            <line x1={IPL} y1={IH-IPB} x2={IW-IPR} y2={IH-IPB} stroke={th.border} strokeWidth="1"/>
+            {/* Linha LF */}
+            {lf<=maxV&&<>
+              <line x1={IPL} y1={toIY(lf)} x2={IW-IPR} y2={toIY(lf)} stroke="#06b6d4" strokeWidth="1" strokeDasharray="4,3" opacity="0.6"/>
+              <text x={IW-IPR+3} y={toIY(lf)+4} fill="#06b6d4" fontSize="8">LF</text>
+            </>}
+            {/* Linha FIRE */}
+            {fire<=maxV&&<>
+              <line x1={IPL} y1={toIY(fire)} x2={IW-IPR} y2={toIY(fire)} stroke="#ef4444" strokeWidth="1" strokeDasharray="4,3" opacity="0.6"/>
+              <text x={IW-IPR+3} y={toIY(fire)+4} fill="#ef4444" fontSize="8">FIRE</text>
+            </>}
+            {/* X ticks */}
+            {xTicks.map(yr=>{
+              const isSel=selYr===yr;
+              const x=toIX(yr);
+              return(<g key={yr} style={{cursor:"pointer"}} onClick={()=>setSelYr(yr)}>
+                <line x1={x} y1={IPT} x2={x} y2={IH-IPB}
+                  stroke={isSel?"#3b82f6":th.border} strokeWidth={isSel?2:1}
+                  strokeDasharray={isSel?"none":"2,4"} opacity={isSel?0.9:0.4}/>
+                <rect x={x-14} y={IH-IPB+2} width={28} height={16} rx={4}
+                  fill={isSel?"#3b82f6":"transparent"} opacity={0.15}/>
+                <text x={x} y={IH-IPB+13} textAnchor="middle"
+                  fill={isSel?"#3b82f6":th.textLow} fontSize="8" fontWeight={isSel?"700":"400"}>{yr}a</text>
+              </g>);
+            })}
+            {/* Linha vertical seleccionada */}
+            <line x1={toIX(selYr)} y1={IPT} x2={toIX(selYr)} y2={IH-IPB}
+              stroke="#3b82f6" strokeWidth="1.5" opacity="0.35"/>
+            {/* Projecções */}
+            {lines.map(({pts,color:lc,label:ll},li)=>(
+              <g key={li}>
+                <polyline
+                  points={pts.map(p=>`${toIX(p.yr)},${toIY(p.val)}`).join(" ")}
+                  fill="none" stroke={lc} strokeWidth={li===1?2:1.5} strokeDasharray="5,3" opacity="0.9"/>
+                {pts.filter(p=>p.yr>0).map((p,pi)=>(
+                  <circle key={pi} cx={toIX(p.yr)} cy={toIY(p.val)} r="6"
+                    fill="transparent" stroke="transparent"
+                    onMouseEnter={()=>setTooltip({x:toIX(p.yr),y:toIY(p.val),val:p.val,lc,ll,yr:p.yr})}
+                    style={{cursor:"pointer"}}/>
+                ))}
+                {(()=>{const sp=pts.find(p=>p.yr===selYr);if(!sp)return null;return(
+                  <circle cx={toIX(sp.yr)} cy={toIY(sp.val)} r="4" fill={lc} stroke={th.bgCard} strokeWidth="1.5"/>
+                );})()}
+              </g>
+            ))}
+            {/* Tooltip */}
+            {tooltip&&(()=>{
+              const TW=85,TH=28;
+              const tx=Math.min(tooltip.x+8,IW-IPR-TW);
+              const ty=Math.max(tooltip.y-TH-6,IPT);
+              return(<g>
+                <rect x={tx} y={ty} width={TW} height={TH} rx={5}
+                  fill={th.bgCard} stroke={tooltip.lc} strokeWidth="1.5" opacity="0.97"/>
+                <text x={tx+TW/2} y={ty+10} textAnchor="middle" fill={tooltip.lc} fontSize="8" fontWeight="700">{tooltip.ll} · {tooltip.yr}a</text>
+                <text x={tx+TW/2} y={ty+22} textAnchor="middle" fill={th.text} fontSize="10" fontWeight="700">{fmtV(tooltip.val)}</text>
+              </g>);
+            })()}
+          </svg>
+        </div>
+        {/* Painel lateral */}
+        <div style={{width:110,flexShrink:0,background:th.bgAlt,borderRadius:10,padding:"10px 12px",border:`1px solid ${th.border}`}}>
+          <p style={{fontSize:10,fontWeight:700,color:"#3b82f6",marginBottom:8,textAlign:"center"}}>📍 {selYr} anos</p>
+          {[{v:selVals.v5,c:"#94a3b8",l:"5%"},{v:selVals.v8,c:"#06b6d4",l:"8%"},{v:selVals.v10,c:"#f59e0b",l:"10%"}].map(({v,c,l})=>(
+            <div key={l} style={{marginBottom:6,padding:"4px 6px",borderRadius:6,background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)"}}>
+              <p style={{fontSize:9,color:th.textLow,marginBottom:1}}>{l}</p>
+              <p style={{fontSize:13,fontWeight:700,color:c}}>{fmtV(v)}</p>
+            </div>
+          ))}
+          <p style={{fontSize:8,color:th.textLow,marginTop:6,textAlign:"center"}}>clica no eixo X</p>
+        </div>
+      </div>
+      {/* Legenda */}
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
+        {[{color:"#94a3b8",label:"5%",dash:true},{color:"#06b6d4",label:"8%",dash:true},{color:"#f59e0b",label:"10%",dash:true},{color:"#06b6d4",label:"LF",dash:true,dashed2:true},{color:"#ef4444",label:"FIRE",dash:true}].map(l=>(
+          <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{width:16,height:2,background:l.color,borderRadius:1,borderTop:l.dash?`2px dashed ${l.color}`:"none"}}/>
+            <span style={{fontSize:10,color:th.textLow}}>{l.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    )}</ThemeCtx.Consumer>
+  );
+}
+
 export default function App(){
   const isMobile=useIsMobile();
   const [screen,setScreen]=useState("landing");
@@ -2401,7 +2640,7 @@ export default function App(){
               {(()=>{
                 const anoBase=new Date().getFullYear();
                 const mesBase=new Date().getMonth(); // 0-indexed
-                const projYears=20;
+                const projYears=40;
                 const projMonths=projYears*12;
                 const r5=5/100/12,r8=8/100/12,r10=10/100/12;
 
@@ -2430,7 +2669,7 @@ export default function App(){
                   const innerIW=IW-IPL-IPR,innerIH=IH-IPT-IPB;
                   const toIX=(yr)=>IPL+(yr/projYears)*innerIW;
                   const toIY=v=>IPT+innerIH-((v/maxV)*innerIH);
-                  const xTicks=[0,5,10,15,20];
+                  const xTicks=[0,5,10,15,20,25,30,35,40];
                   const selVals={
                     v5:p5.find(p=>p.yr===selYr)?.val??0,
                     v8:p8.find(p=>p.yr===selYr)?.val??0,
@@ -2604,7 +2843,19 @@ export default function App(){
                   </Card>
                 ):null;
 
-                return(<>{individualChart}{agregChart}</>);
+                // ── Simulador FIRE híbrido ──────────────────────────────
+                const FireSim=(()=>{
+                  const fireItems=PATRIMONIO_ATIVOS.filter(a=>a.grupo==="investimento"&&a.id!=="ppr_lex");
+                  // Capital inicial = soma dos últimos valores registados
+                  const autoCapital=fireItems.reduce((sum,it)=>{
+                    const vals=patSnaps.map(s=>s.ativos?.[it.id]?.valor).filter(Boolean);
+                    return sum+(vals.length?vals[vals.length-1]:it.v0||0);
+                  },0);
+                  const autoMensal=fireItems.reduce((sum,it)=>sum+(it.mensal||0),0); // 155€/mês
+                  return <FireSimCard autoCapital={autoCapital} autoMensal={autoMensal} th={th} darkMode={darkMode} fE={fE} fmtV={v=>v>=1000000?(v/1000000).toFixed(2)+"M":v>=1000?(v/1000).toFixed(1)+"k":v.toFixed(0)+"€"}/>;
+                })();
+
+                return(<>{individualChart}{agregChart}{FireSim}</>);
               })()}
             </>);
           })()}
