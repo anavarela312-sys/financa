@@ -1184,14 +1184,22 @@ export default function App(){
 
   // Confirm all pre-filled at once
   const confirmAll=()=>{
-    const preenchidos=pend.filter(t=>t.ok);
-    const allToConfirm=[...pend]; // validate against all pending including uncategorized
+    // Aplicar edições de pEd antes de confirmar
+    const pendComEd=pend.map(t=>{
+      const ed=pEd[t.id]||{};
+      const cat=ed.cat!==undefined?ed.cat:t.cat;
+      const sub=ed.sub!==undefined?ed.sub:t.sub;
+      const ent=ed.ent!==undefined?ed.ent:t.ent;
+      const nota=ed.nota!==undefined?ed.nota:t.nota;
+      const data=ed.data||t.data;
+      return{...t,cat,sub,ent,nota,data,ok:!!cat,contaId:t.contaId||ed.contaOrigem||"mill"};
+    });
+    const preenchidos=pendComEd.filter(t=>t.ok);
     setTrans(prev=>{
       const ids=new Set(prev.map(t=>t.desc+t.data+t.val));
-      const novos=preenchidos.filter(t=>!ids.has(t.desc+t.data+t.val));
-      return[...prev,...novos];
+      return[...prev,...preenchidos.filter(t=>!ids.has(t.desc+t.data+t.val))];
     });
-    const remaining=pend.filter(t=>!t.ok);
+    const remaining=pendComEd.filter(t=>!t.ok);
     setPend(remaining);
     if(!remaining.length)setTab("transacoes");
   };
@@ -3211,8 +3219,8 @@ export default function App(){
                 {Object.keys(cats).filter(c=>!["Transferência Interna","Receita","Poupança"].includes(c)).sort((a,b)=>a.localeCompare(b,"pt")).map(cat=>{
                   const cfg=cats[cat],d=catData[cat]||{out:0,in:0,subs:{}};
                   const net=NET_CATS.has(cat)?d.out-d.in:d.out;
-                  // Orçamento da categoria = soma das subcategorias (auto-calculado)
-                  const subOrcTotal=Object.keys(d.subs||{}).reduce((a,sub)=>{
+                  // Orçamento da categoria = soma das subcategorias definidas em cats (não só as com gastos)
+                  const subOrcTotal=(cats[cat]?.subs||[]).reduce((a,sub)=>{
                     const key=`${cat}::${sub}`;
                     return a+(orcMes[key]||0);
                   },0);
@@ -3529,14 +3537,36 @@ export default function App(){
               {pend.length>0&&(
                 <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
                   <Btn variant="success" style={{fontSize:12,padding:"8px 16px"}} onClick={()=>{
-                    const preench=pend.filter(t=>t.ok);
+                    // Aplicar edições de pEd + marcar ok se tem cat
+                    const pendComEd=pend.map(t=>{
+                      const ed=pEd[t.id]||{};
+                      const cat=ed.cat!==undefined?ed.cat:t.cat;
+                      const sub=ed.sub!==undefined?ed.sub:t.sub;
+                      const ent=ed.ent!==undefined?ed.ent:t.ent;
+                      const nota=ed.nota!==undefined?ed.nota:t.nota;
+                      const data=ed.data||t.data;
+                      const ok=!!cat;
+                      return{...t,cat,sub,ent,nota,data,ok,contaId:t.contaId||ed.contaOrigem||"mill"};
+                    });
+                    const preench=pendComEd.filter(t=>t.ok);
                     setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...preench.filter(t=>!ids.has(t.desc+t.data+t.val))];});
-                    setPend(pend.filter(t=>!t.ok));
-                    if(pend.filter(t=>!t.ok).length===0)setTab("transacoes");
-                  }}>✓ Confirmar {pend.filter(t=>t.ok).length} pré-preenchidos</Btn>
+                    const remaining=pendComEd.filter(t=>!t.ok);
+                    setPend(remaining);
+                    if(!remaining.length)setTab("transacoes");
+                  }}>✓ Confirmar {pend.filter(t=>t.ok||(pEd[t.id]?.cat)).length} categorizados</Btn>
                   <Btn variant="primary" style={{fontSize:12,padding:"8px 16px"}} onClick={()=>{
-                    const validacao = validarSaldoAposImport(pend, trans);
-                    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...pend.filter(t=>!ids.has(t.desc+t.data+t.val))];});
+                    // Aplicar edições de pEd a todos antes de confirmar
+                    const pendComEd=pend.map(t=>{
+                      const ed=pEd[t.id]||{};
+                      const cat=ed.cat!==undefined?ed.cat:t.cat;
+                      const sub=ed.sub!==undefined?ed.sub:t.sub;
+                      const ent=ed.ent!==undefined?ed.ent:t.ent;
+                      const nota=ed.nota!==undefined?ed.nota:t.nota;
+                      const data=ed.data||t.data;
+                      return{...t,cat,sub,ent,nota,data,ok:!!cat,contaId:t.contaId||ed.contaOrigem||"mill"};
+                    });
+                    const validacao = validarSaldoAposImport(pendComEd, trans);
+                    setTrans(prev=>{const ids=new Set(prev.map(t=>t.desc+t.data+t.val));return[...prev,...pendComEd.filter(t=>!ids.has(t.desc+t.data+t.val))];});
                     setPend([]);
                     setTab("transacoes");
                     if(validacao){
