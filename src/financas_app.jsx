@@ -808,6 +808,26 @@ export default function App(){
   const [snaps,setSnaps,forceSnaps]=useLS("fin_snaps_v6",DEF_SNAPS);
 
   const [cats,setCats,forceCats]=useLS("fin_cats_v6",DEFAULT_CATS);
+  // Migrate cats on mount (fix Supermercado location)
+  useEffect(()=>{
+    setCats(prev=>{
+      const next={...prev};
+      let changed=false;
+      if(next["Alimentação"]?.subs?.includes("Supermercado")){
+        next["Alimentação"]={...next["Alimentação"],subs:next["Alimentação"].subs.filter(s=>s!=="Supermercado")};
+        changed=true;
+      }
+      if(next["Casa"]&&!next["Casa"]?.subs?.includes("Supermercado")){
+        next["Casa"]={...next["Casa"],subs:[...(next["Casa"].subs||[]),"Supermercado"]};
+        changed=true;
+      }
+      if(next["Transferência Interna"]&&!next["Transferência Interna"]?.subs?.includes("Poupança")){
+        next["Transferência Interna"]={...next["Transferência Interna"],subs:["Poupança",...(next["Transferência Interna"].subs||[])]};
+        changed=true;
+      }
+      return changed?next:prev;
+    });
+  },[]);
 
   const [patSnaps,setPatSnaps]=useLS("fin_pat_v1",[]);
   const [empTab,setEmpTab]=useState("mensal");
@@ -820,6 +840,25 @@ export default function App(){
   });
   const allData=useMemo(()=>({trans,pend,contas,orcs,snaps,cats,patSnaps,empData}),[trans,pend,contas,orcs,snaps,cats,patSnaps,empData]);
   // Helper: migrate orcs keys Alimentação::Supermercado → Casa::Supermercado
+  // Migrate cats: mover Supermercado de Alimentação → Casa
+  const migrateCats = (catsObj) => {
+    if (!catsObj) return catsObj;
+    const next = {...catsObj};
+    // Remove Supermercado das subs de Alimentação
+    if (next["Alimentação"]?.subs?.includes("Supermercado")) {
+      next["Alimentação"] = {...next["Alimentação"], subs: next["Alimentação"].subs.filter(s=>s!=="Supermercado")};
+    }
+    // Garantir que Casa tem Supermercado
+    if (next["Casa"] && !next["Casa"]?.subs?.includes("Supermercado")) {
+      next["Casa"] = {...next["Casa"], subs: [...(next["Casa"].subs||[]), "Supermercado"]};
+    }
+    // Garantir que Transferência Interna tem Poupança
+    if (next["Transferência Interna"] && !next["Transferência Interna"]?.subs?.includes("Poupança")) {
+      next["Transferência Interna"] = {...next["Transferência Interna"], subs: ["Poupança",...(next["Transferência Interna"].subs||[])]};
+    }
+    return next;
+  };
+
   const migrateOrcs = (orcsObj) => {
     if (!orcsObj) return orcsObj;
     let changed = false;
@@ -845,7 +884,7 @@ export default function App(){
     if(json.contas?.length>0) forceContas(migrateContas(json.contas));
     if(json.orcs && Object.keys(json.orcs).length>0) forceOrcs(migrateOrcs(json.orcs));
     if(json.snaps?.length>0) forceSnaps(json.snaps);
-    if(json.cats && Object.keys(json.cats).length>0) forceCats(json.cats);
+    if(json.cats && Object.keys(json.cats).length>0) forceCats(migrateCats(json.cats));
     if(json.patSnaps?.length>0) setPatSnaps(json.patSnaps);
     if(json.empData) setEmpData(json.empData);
   },[forceTrans,forcePend,forceContas,forceOrcs,forceSnaps,forceCats,setPatSnaps]);
@@ -874,6 +913,12 @@ export default function App(){
   const [addManual,setAddManual]=useState(false);
   const [contaFiltro,setContaFiltro]=useState("mill"); // selected account in transactions
   const [manualT,setManualT]=useState({data:new Date().toISOString().slice(0,10),desc:"",val:"",tipo:"d",cat:"",sub:"",ent:"",nota:"",contaOrigem:"mill",contaDestino:""});
+  // Keep manualT.contaOrigem in sync with contaFiltro when not "all"
+  useEffect(()=>{
+    if(contaFiltro&&contaFiltro!=="all"){
+      setManualT(prev=>({...prev,contaOrigem:contaFiltro}));
+    }
+  },[contaFiltro]);
 
   const [search,setSearch]=useState("");
   const [globalSearch,setGlobalSearch]=useState("");
@@ -3178,10 +3223,17 @@ export default function App(){
                       </div>
                       {orc>0&&(()=>{const pct=orc>0?net/orc*100:0;const barColor=pct>=100?"#ef4444":pct>=75?"#f59e0b":"#22c55e";return<><PBar val={net} max={orc} color={barColor}/><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:9,color:th.textLow}}>{pct.toFixed(0)}%</span><span style={{fontSize:9,color:over?"#ef4444":th.textLow}}>{over?`+${fE(net-orc)} acima`:`${fE(orc-net)} livre`}</span></div></>})()}
                       {/* Subcategories with orçamento detail */}
-                      {(Object.entries(d.subs||{}).filter(([,v])=>v>0).length>0||orcEdit)&&(
+                      {(()=>{
+                        // Mostrar: subs com gastos OU subs com orçamento definido
+                        const subsComGastos=Object.entries(d.subs||{}).filter(([,v])=>v>0).map(([s])=>s);
+                        const subsComOrc=(cats[cat]?.subs||[]).filter(sub=>(orcMes[`${cat}::${sub}`]||0)>0);
+                        const todasSubs=[...new Set([...subsComGastos,...subsComOrc])].sort((a,b)=>a.localeCompare(b,"pt"));
+                        if(!todasSubs.length&&!orcEdit) return null;
+                        return(
                         <div style={{marginTop:4}}>
                           {/* Sub spending with bars + click */}
-                          {Object.entries(d.subs||{}).filter(([,v])=>v>0).sort((a,b)=>a[0].localeCompare(b[0],"pt")).map(([sub,val])=>{
+                          {todasSubs.map(sub=>{
+                            const val=d.subs?.[sub]||0;
                             const subOrcKey=`${cat}::${sub}`;
                             const subOrc=orcMes[subOrcKey]||0;
                             const subPct=subOrc>0?val/subOrc*100:0;
@@ -3209,7 +3261,7 @@ export default function App(){
                               </div>
                             );
                           })}
-                          {orcEdit&&[...(cats[cat]?.subs||[])].sort((a,b)=>a.localeCompare(b,"pt")).filter(sub=>!(d.subs?.[sub]>0)).map(sub=>{
+                          {orcEdit&&[...(cats[cat]?.subs||[])].sort((a,b)=>a.localeCompare(b,"pt")).filter(sub=>!(d.subs?.[sub]>0)&&!((orcMes[`${cat}::${sub}`]||0)>0)).map(sub=>{
                             const subOrcKey=`${cat}::${sub}`;
                             const subOrc=orcMes[subOrcKey]||0;
                             return(
@@ -3225,7 +3277,7 @@ export default function App(){
                             );
                           })}
                         </div>
-                      )}
+                        );})()}
                     </div>
                   );
                 })}
@@ -3765,14 +3817,37 @@ export default function App(){
               <span style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":th.text,flexShrink:0}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</span>
             </div>
           ))}
-          <div style={{marginTop:14,padding:"10px",background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
-            <span style={{fontSize:13,color:th.textLow}}>Total saídas</span>
-            <span style={{fontSize:14,fontWeight:600,color:"#ef4444"}}>{fE(catTransactions.filter(t=>t.tipo==="d").reduce((a,t)=>a+t.val,0))}</span>
-          </div>
-          {catTransactions.some(t=>t.tipo==="c")&&<div style={{padding:"6px 10px",background:"rgba(34,197,94,0.08)",borderRadius:10,display:"flex",justifyContent:"space-between",marginTop:6}}>
-            <span style={{fontSize:13,color:th.textLow}}>Reembolsos/entradas</span>
-            <span style={{fontSize:14,fontWeight:600,color:"#22c55e"}}>{fE(catTransactions.filter(t=>t.tipo==="c").reduce((a,t)=>a+t.val,0))}</span>
-          </div>}
+          {(()=>{
+            const totalOut=catTransactions.filter(t=>t.tipo==="d").reduce((a,t)=>a+t.val,0);
+            const totalIn=catTransactions.filter(t=>t.tipo==="c").reduce((a,t)=>a+t.val,0);
+            const saldo=totalIn-totalOut;
+            const isNet=NET_CATS.has(catModalCat)||catModal==="__SEM_CATEGORIA__";
+            const isCOModal=catModal?.includes("::")&&catModal.split("::")[1]==="Compras Outros"||catModalCat==="Vários / Extras";
+            const showNet=isNet||isCOModal||totalIn>0;
+            return(<>
+              {showNet?(
+                <div style={{marginTop:14,padding:"10px",background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:saldo!==0&&totalIn>0?6:0}}>
+                    <span style={{fontSize:13,color:th.textLow}}>Total saídas</span>
+                    <span style={{fontSize:13,fontWeight:600,color:"#ef4444"}}>{fE(totalOut)}</span>
+                  </div>
+                  {totalIn>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                    <span style={{fontSize:13,color:th.textLow}}>Entradas / reembolsos</span>
+                    <span style={{fontSize:13,fontWeight:600,color:"#22c55e"}}>+{fE(totalIn)}</span>
+                  </div>}
+                  <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${th.border}`,paddingTop:6,marginTop:4}}>
+                    <span style={{fontSize:13,fontWeight:600,color:th.text}}>Saldo líquido</span>
+                    <span style={{fontSize:14,fontWeight:700,color:saldo<=0?"#ef4444":"#22c55e"}}>{fE(saldo)}</span>
+                  </div>
+                </div>
+              ):(
+                <div style={{marginTop:14,padding:"10px",background:darkMode?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.03)",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:13,color:th.textLow}}>Total saídas</span>
+                  <span style={{fontSize:14,fontWeight:600,color:"#ef4444"}}>{fE(totalOut)}</span>
+                </div>
+              )}
+            </>);
+          })()}
         </Modal>
       )}
 
