@@ -1013,9 +1013,16 @@ export default function App(){
   const catData=useMemo(()=>{
     const d={};
     transMesTodos.filter(t=>!isInt(t)).forEach(t=>{
-      if(!d[t.cat])d[t.cat]={out:0,in:0,subs:{}};
-      if(t.tipo==="d"){d[t.cat].out+=t.val;if(!d[t.cat].subs[t.sub])d[t.cat].subs[t.sub]=0;d[t.cat].subs[t.sub]+=t.val;}
-      else d[t.cat].in+=t.val;
+      if(!d[t.cat])d[t.cat]={out:0,in:0,subs:{},subsIn:{}};
+      if(t.tipo==="d"){
+        d[t.cat].out+=t.val;
+        if(!d[t.cat].subs[t.sub])d[t.cat].subs[t.sub]=0;
+        d[t.cat].subs[t.sub]+=t.val;
+      } else {
+        d[t.cat].in+=t.val;
+        if(!d[t.cat].subsIn[t.sub])d[t.cat].subsIn[t.sub]=0;
+        d[t.cat].subsIn[t.sub]+=t.val;
+      }
     });
     return d;
   },[transMesTodos]);
@@ -3280,22 +3287,30 @@ export default function App(){
                         <div style={{marginTop:4}}>
                           {/* Sub spending with bars + click */}
                           {todasSubs.map(sub=>{
-                            const val=d.subs?.[sub]||0;
+                            const subOut=d.subs?.[sub]||0;
+                            const subIn=d.subsIn?.[sub]||0;
+                            // Para NET_CATS mostrar saldo líquido (entradas - saídas), senão só saídas
+                            const val=NET_CATS.has(cat)?subOut-subIn:subOut;
+                            const displayVal=NET_CATS.has(cat)?subOut-subIn:subOut;
                             const subOrcKey=`${cat}::${sub}`;
                             const subOrc=orcMes[subOrcKey]||0;
-                            const subPct=subOrc>0?val/subOrc*100:0;
-                            const subOver=subOrc>0&&val>subOrc;
+                            const absVal=Math.abs(val);
+                            const subPct=subOrc>0?absVal/subOrc*100:0;
+                            const subOver=subOrc>0&&absVal>subOrc;
                             const subColor=subOver?"#ef4444":subPct>=75?"#f59e0b":"#22c55e";
-                            // Bar: semáforo se há orçamento, proporção da categoria se não há
-                            const barMax = subOrc>0 ? subOrc : net;
+                            const barMax = subOrc>0 ? subOrc : Math.abs(net)||1;
                             const barColor = subOrc>0 ? subColor : "#22c55e";
+                            const isNetSub=NET_CATS.has(cat);
                             return(
                               <div key={sub} style={{padding:"4px 0 4px 30px",cursor:"pointer"}}
                                 onClick={e=>{e.stopPropagation();setCatModal(cat+"::"+sub);}}>
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
                                   <span style={{fontSize:11,color:th.textMid}}>{sub||"Sem subcategoria"}</span>
                                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":th.text}}>{fE(val)}</span>
+                                    {isNetSub&&subIn>0&&<span style={{fontSize:10,color:"#22c55e"}}>+{fE(subIn)}</span>}
+                                    <span style={{fontSize:11,fontWeight:500,color:subOver?"#ef4444":val<0?"#22c55e":th.text}}>
+                                      {isNetSub?fE(displayVal):fE(subOut)}
+                                    </span>
                                     {orcEdit?(
                                       <input type="number" defaultValue={subOrc||""} placeholder="0"
                                         onClick={e=>e.stopPropagation()}
@@ -3304,7 +3319,7 @@ export default function App(){
                                     ):(subOrc>0&&<span style={{fontSize:10,color:th.textLow}}>/{fE(subOrc)}</span>)}
                                   </div>
                                 </div>
-                                <PBar val={val} max={barMax} color={barColor} h={3}/>
+                                <PBar val={absVal} max={barMax} color={barColor} h={3}/>
                               </div>
                             );
                           })}
