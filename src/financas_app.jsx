@@ -521,8 +521,8 @@ function PieChart({data,size=160}){
 function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
   const [capital, setCapital] = React.useState(Math.round(autoCapital));
   const [mensal, setMensal] = React.useState(autoMensal);
-  const [mensal2, setMensal2] = React.useState(1200);
-  const [fase2Ano, setFase2Ano] = React.useState(0.75); // ~9 meses = Nov 2026 aprox
+  const [mensal2, setMensal2] = React.useState(1355); // 155€ actuais + 1200€ XTB
+  const [fase2Ano, setFase2Ano] = React.useState(2.5); // Nov 2028 ≈ 2.5 anos
   const [despMensal, setDespMensal] = React.useState(3500);
   const [lf, setLf] = React.useState(500000);
   const [fire, setFire] = React.useState(()=>Math.round(3500*12/0.04));
@@ -1221,7 +1221,10 @@ export default function App(){
     );
     const maisRecente = sorted[0];
     const saldoBanco = maisRecente.saldoExtrato;
-    // Calcular saldo da conta mill a partir de todos os trans (incluindo os recém confirmados)
+    const dataRef = maisRecente.data;
+    // Actualizar saldoRef do Millennium automaticamente com o saldo do banco
+    setContas(prev=>prev.map(c=>c.id==="mill"?{...c,saldoRef:saldoBanco,saldoRefData:dataRef}:c));
+    // Calcular saldo para validação
     const allTrans = [...transAtuais, ...pendToValidate];
     const millConta = contas.find(c=>c.id==="mill");
     let saldoCalculado = null;
@@ -1229,8 +1232,8 @@ export default function App(){
       const movs = allTrans.filter(t=>(t.contaId||t.contaOrigem||"mill")==="mill" && t.data>millConta.saldoRefData);
       saldoCalculado = millConta.saldoRef + movs.reduce((a,t)=>a+(t.tipo==="c"?t.val:-t.val),0);
     }
-    return { saldoBanco, saldoCalculado, dataRef: maisRecente.data };
-  }, [contas]);
+    return { saldoBanco, saldoCalculado, dataRef };
+  }, [contas, setContas]);
   const markInt=id=>{const t=pend.find(p=>p.id===id);if(!t)return;setTrans(prev=>[...prev,{...t,cat:"Transferência Interna",sub:"Outro",ok:true}]);const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");};
   const ignP=id=>{const r=pend.filter(p=>p.id!==id);setPend(r);if(!r.length)setTab("transacoes");};
   const saveEdit=id=>{setTrans(prev=>prev.map(t=>t.id===id?{...t,...editD}:t));setEditId(null);};
@@ -1679,30 +1682,27 @@ export default function App(){
                         <td/>
                       </tr>
                     )}
-                    <tr style={{background:"rgba(239,68,68,0.05)",borderTop:"1px solid rgba(239,68,68,0.2)"}}>
-                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Subtotal despesas fixas</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespesasFixas)}</td>
-                      <td/>
-                    </tr>
-                    {totalDespVar>0&&<tr style={{background:"rgba(239,68,68,0.05)"}}>
-                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Despesas variáveis</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>—</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespVar)}</td>
-                      <td/>
-                    </tr>}
-                    <tr style={{background:"rgba(239,68,68,0.05)",borderTop:"1px solid rgba(239,68,68,0.2)"}}>
-                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Subtotal despesas fixas</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespesasFixas)}</td>
-                      <td/>
-                    </tr>
-                    {totalDespVar>0&&<tr style={{background:"rgba(239,68,68,0.05)"}}>
-                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Despesas variáveis</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>—</td>
-                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespVar)}</td>
-                      <td/>
-                    </tr>}
+                    {/* Despesas variáveis como linhas individuais */}
+                    {despVar.length>0&&<>
+                      <tr><td colSpan={4} style={{padding:"6px 10px 2px",fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,background:"rgba(59,130,246,0.03)",borderTop:`1px solid ${th.border}`}}>Despesas variáveis</td></tr>
+                      {despVar.map(dv=>{
+                        const catInfo=EMP_CATS_VARIAVEIS.find(c=>c.id===dv.cat);
+                        return(<tr key={dv.id} style={{background:"rgba(59,130,246,0.02)",borderBottom:`1px solid ${th.border}`}}>
+                          <td style={{padding:"6px 10px"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span>{catInfo?.icon||"📦"}</span>
+                              <div>
+                                <p style={{fontSize:12}}>{dv.nota||catInfo?.label||"Despesa variável"}</p>
+                                <p style={{fontSize:10,color:th.textLow}}>{catInfo?.label}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{padding:"6px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>—</td>
+                          <td style={{padding:"6px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(dv.valor)}</td>
+                          <td style={{padding:"6px 10px",textAlign:"right",fontSize:10,color:"#f59e0b"}}>{catInfo?.ta>0?`TA ${(catInfo.ta*100).toFixed(0)}%`:""}</td>
+                        </tr>);
+                      })}
+                    </>}
                     <tr style={{background:"rgba(239,68,68,0.08)",borderTop:"2px solid rgba(239,68,68,0.3)"}}>
                       <td style={{padding:"9px 10px",fontWeight:700,color:"#ef4444"}}>TOTAL</td>
                       <td style={{padding:"9px 10px",textAlign:"right",color:th.textLow,fontWeight:600}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
@@ -3042,7 +3042,7 @@ export default function App(){
                 // Taxa de poupança = movimentos Poupança+Investimento / receitas
                 const poupancaInvest=transMesTodos.filter(t=>t.tipo==="d"&&(t.cat==="Poupança"||t.cat==="Investimento"||(t.cat==="Transferência Interna"&&t.sub==="Poupança"))).reduce((a,t)=>a+t.val,0);
                 const taxaPoupanca=totR>0?(poupancaInvest/totR*100):0;
-                const totalOrc=Object.entries(orcMes).filter(([k])=>!k.includes("::")).reduce((a,b)=>a+b[1],0);
+                const totalOrc=totalOrçamentado; // usar mesmo cálculo do tab Orçamento
                 const pctOrc=totalOrc>0?(totD/totalOrc*100):0;
                 const saldoPct=totR>0?(saldo/totR*100):0;
                 const kpis=[
@@ -3209,15 +3209,17 @@ export default function App(){
                 const saldoPrevisto=totR-totalOrçamentado;
                 const saldoReal=totR-totD;
                 const pctOrcUsado=totalOrçamentado>0?(totD/totalOrçamentado*100):0;
+                const poupMes=transMesTodos.filter(t=>t.tipo==="d"&&(t.cat==="Poupança"||t.cat==="Investimento"||(t.cat==="Transferência Interna"&&t.sub==="Poupança"))).reduce((a,t)=>a+t.val,0);
                 const orcKpis=[
                   {label:"Receitas",sub:"entradas do mês",val:fE(totR),color:"#22c55e"},
                   {label:"Despesas reais",sub:"gastos até agora",val:fE(totD),color:"#ef4444"},
                   {label:"Saldo previsto",sub:"receitas − orçamento",val:fE(saldoPrevisto),color:saldoPrevisto>=0?"#22c55e":"#ef4444",sub2:saldoPrevisto>=0?"✓ dentro do plano":"⚠ acima do plano"},
                   {label:"Saldo real",sub:"receitas − gastos reais",val:fE(saldoReal),color:saldoReal>=0?"#22c55e":"#ef4444"},
+                  {label:"Poupança + Invest.",sub:"transferido este mês",val:fE(poupMes),color:"#10b981"},
                   {label:"Orçamento usado",sub:totalOrçamentado>0?`${fE(totD)} de ${fE(totalOrçamentado)}`:"sem orçamento",val:totalOrçamentado>0?`${pctOrcUsado.toFixed(0)}%`:"—",color:pctOrcUsado>100?"#ef4444":pctOrcUsado>80?"#f59e0b":"#22c55e"},
                 ];
                 return(
-                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)",gap:8,marginBottom:14}}>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(6,1fr)",gap:8,marginBottom:14}}>
                     {orcKpis.map(k=>(
                       <div key={k.label} style={{background:th.bgCard,border:`1px solid ${k.color}33`,borderRadius:12,padding:"10px 12px"}}>
                         <p style={{fontSize:9,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{k.label}</p>
