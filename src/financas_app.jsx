@@ -328,7 +328,7 @@ const EMP_DESPESAS_FIXAS = [
   { id:"tsu",        label:"TSU / Segurança Social",     valor:347.50, icon:"🏛️",  cat:"rh" },
   { id:"leasing",    label:"Leasing CA Auto Bank",        valor:416.31, icon:"🚗",  cat:"fixo", nota:"Até Ago 2027" },
   { id:"inelconta",  label:"Inelconta (Contabilidade)",   valor:196.80, icon:"📊",  cat:"fixo" },
-  { id:"cvfx_ref",   label:"Cover Flex — Refeição",       valor:200.00, icon:"🍽️", cat:"rh" },
+  { id:"cvfx_ref",   label:"Cover Flex — Refeição",       valor:240.00, icon:"🍽️", cat:"rh" },
   { id:"cvfx_inf",   label:"Cover Flex — Cheque Infância",valor:450.00, icon:"👧",  cat:"rh" },
   { id:"fidelidade", label:"Fidelidade — Seguro Saúde",   valor:135.47, icon:"🏥",  cat:"fixo" },
   { id:"salario",    label:"Salário João (líquido)",       valor:1000.00,icon:"👤",  cat:"rh" },
@@ -336,7 +336,6 @@ const EMP_DESPESAS_FIXAS = [
   { id:"vodafone",   label:"Vodafone",                    valor:103.75, icon:"📱",  cat:"fixo" },
   { id:"zoom",       label:"Zoom",                        valor:15.99,  icon:"💻",  cat:"fixo" },
   { id:"claude",     label:"Claude AI",                   valor:18.00,  icon:"🤖",  cat:"fixo" },
-  { id:"tesla",      label:"Tesla Carregamentos",          valor:10.00,  icon:"⚡",  cat:"var", nota:"Estimado" },
   { id:"irs_ret",    label:"Retenção IRS",                valor:14.00,  icon:"🏦",  cat:"fiscal" },
 ];
 
@@ -1414,12 +1413,14 @@ export default function App(){
     });
     // Subsidio extra: salário + TSU completa + retenção IRS (Cover Flex não duplica)
     const subsidioExtra = isSubsidio ? (despMes["salario"]||0) + (despMes["tsu"]||0) + (despMes["irs_ret"]||0) : 0;
-    const totalDespesas = Object.values(despMes).reduce((a,b)=>a+b,0) + subsidioExtra;
-    const resultado = receitaBruta - totalDespesas;
+    const totalDespesasFixas = Object.values(despMes).reduce((a,b)=>a+b,0) + subsidioExtra;
 
     // Despesas variáveis do mês
     const despVar = empData.despesasVar?.[empMesKey] || [];
     const totalDespVar = despVar.reduce((a,d)=>a+(d.valor||0), 0);
+
+    const totalDespesas = totalDespesasFixas + totalDespVar;
+    const resultado = receitaBruta - totalDespesas;
 
     // Tributações Autónomas
     const taAjudas = (despMes["ajudas"]||750) * EMP_TA_AJUDAS;
@@ -1537,7 +1538,7 @@ export default function App(){
               {/* KPIs mensais */}
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:10,marginBottom:12}}>
                 {[
-                  {label:"Total Despesas",val:totalDespesas,color:"#ef4444",sub:isSubsidio?"⚠ incl. subsídio":""},
+                  {label:"Total Despesas",val:totalDespesas,color:"#ef4444",sub:isSubsidio?"⚠ incl. subsídio":(totalDespVar>0?`incl. ${fE(totalDespVar)} variáveis`:"")},
                   {label:"Resultado",val:resultado,color:resultado>=0?"#22c55e":"#ef4444",sub:resultado>=0?"✓ Positivo":"⚠ Negativo"},
                   {label:"Saldo Conta",val:empData.saldoConta||0,color:"#a855f7",sub:"actualizar manualmente"},
                 ].map(k=>(
@@ -1671,6 +1672,30 @@ export default function App(){
                         <td/>
                       </tr>
                     )}
+                    <tr style={{background:"rgba(239,68,68,0.05)",borderTop:"1px solid rgba(239,68,68,0.2)"}}>
+                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Subtotal despesas fixas</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespesasFixas)}</td>
+                      <td/>
+                    </tr>
+                    {totalDespVar>0&&<tr style={{background:"rgba(239,68,68,0.05)"}}>
+                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Despesas variáveis</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>—</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespVar)}</td>
+                      <td/>
+                    </tr>}
+                    <tr style={{background:"rgba(239,68,68,0.05)",borderTop:"1px solid rgba(239,68,68,0.2)"}}>
+                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Subtotal despesas fixas</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespesasFixas)}</td>
+                      <td/>
+                    </tr>
+                    {totalDespVar>0&&<tr style={{background:"rgba(239,68,68,0.05)"}}>
+                      <td style={{padding:"7px 10px",color:th.textLow,fontSize:12}}>Despesas variáveis</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:th.textLow,fontSize:12}}>—</td>
+                      <td style={{padding:"7px 10px",textAlign:"right",color:"#ef4444",fontSize:12}}>{fE(totalDespVar)}</td>
+                      <td/>
+                    </tr>}
                     <tr style={{background:"rgba(239,68,68,0.08)",borderTop:"2px solid rgba(239,68,68,0.3)"}}>
                       <td style={{padding:"9px 10px",fontWeight:700,color:"#ef4444"}}>TOTAL</td>
                       <td style={{padding:"9px 10px",textAlign:"right",color:th.textLow,fontWeight:600}}>{fE(EMP_DESPESAS_FIXAS.reduce((a,d)=>a+d.valor,0))}</td>
@@ -3471,6 +3496,8 @@ export default function App(){
                                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
                                   <div><Lbl>Data</Lbl><input type="date" value={editD.data} onChange={e=>setEditD(d=>({...d,data:e.target.value}))}/></div>
                                   <div><Lbl>Entidade</Lbl><input type="text" value={editD.ent} onChange={e=>setEditD(d=>({...d,ent:e.target.value}))}/></div>
+                                  <div><Lbl>Valor (€)</Lbl><input type="number" value={editD.val||""} step="0.01" placeholder="0.00" onChange={e=>setEditD(d=>({...d,val:parseFloat(e.target.value)||d.val}))}/></div>
+                                  <div><Lbl>Tipo</Lbl><select value={editD.tipo||"d"} onChange={e=>setEditD(d=>({...d,tipo:e.target.value}))}><option value="d">💸 Débito / Saída</option><option value="c">💰 Crédito / Entrada</option></select></div>
                                   <div><Lbl>Categoria</Lbl><select value={editD.cat} onChange={e=>setEditD(d=>({...d,cat:e.target.value,sub:""}))}>
                                     {Object.keys(cats).sort((a,b)=>a.localeCompare(b,"pt")).map(c=><option key={c} value={c}>{cats[c].icon} {c}</option>)}
                                   </select></div>
@@ -3500,7 +3527,7 @@ export default function App(){
                                 </div>
                               </div>
                             ):(
-                              <div className="trans-row" style={{padding:"7px 12px",cursor:"pointer"}} onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||"",contaOrigem:t.contaOrigem||t.contaId||"",contaDestino:t.contaDestino||""});}}>
+                              <div className="trans-row" style={{padding:"7px 12px",cursor:"pointer"}} onClick={()=>{setEditId(t.id);setEditD({cat:t.cat,sub:t.sub,ent:t.ent,data:t.data,nota:t.nota||"",val:t.val,tipo:t.tipo,contaOrigem:t.contaOrigem||t.contaId||"",contaDestino:t.contaDestino||""});}}>
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                                   <div style={{flex:1,minWidth:0,marginRight:8}}>
                                     <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
