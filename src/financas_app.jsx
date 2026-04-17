@@ -943,6 +943,8 @@ export default function App(){
   const [newCatModal,setNewCatModal]=useState(false);
   const [newCat,setNewCat]=useState({nome:"",icon:"📌",color:"#3b82f6",sub:""});
   const [catEditModal,setCatEditModal]=useState(false);
+  const [catEditando,setCatEditando]=useState(null);
+  const [catNomeEdit,setCatNomeEdit]=useState("");
   const fileRef=useRef();
 
   const mesKey=`${fAno}-${String(fMes+1).padStart(2,"0")}`;
@@ -3629,8 +3631,7 @@ export default function App(){
                       </div>
                     </div>
                   );
-                });
-              })()}
+              })}
             </div>
           )}
 
@@ -3883,10 +3884,7 @@ export default function App(){
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Categorias</p><p style={{fontSize:12,color:th.textLow,marginBottom:14}}>Gere as tuas categorias e subcategorias</p></>}
               <Btn variant="primary" full onClick={()=>setNewCatModal(true)} style={{marginBottom:12,fontSize:13}}>+ Nova categoria</Btn>
-              {(()=>{
-                const [catEditando,setCatEditando]=React.useState(null);
-                const [catNomeEdit,setCatNomeEdit]=React.useState("");
-                return Object.entries(cats).map(([cat,cfg])=>{
+              {Object.entries(cats).map(([cat,cfg])=>{
                   const emEdicao=catEditando===cat;
                   return(
                   <Card key={cat} style={{marginBottom:8}}>
@@ -3941,8 +3939,7 @@ export default function App(){
                     </div>
                   </Card>
                   );
-                });
-              })()}
+              })}
             </div>
           )}
 
