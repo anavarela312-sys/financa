@@ -903,6 +903,7 @@ export default function App(){
   const [simTaxa,setSimTaxa]=useState(8);
   const [patSubTab,setPatSubTab]=useState("geral");
   const [invSelected,setInvSelected]=useState("xtb");
+  const [invMensais,setInvMensais,forceInvMensais]=useLS("fin_inv_mensais_v1",{ppr_opt_ana:25,ppr_opt_joa:30,xtb:100});
   const [newSnap,setNewSnap]=useState("");
   const [snapConta,setSnapConta]=useState("");
   const [snapData,setSnapData]=useState(new Date().toISOString().slice(0,10));
@@ -1274,10 +1275,10 @@ export default function App(){
         .sort((a,b)=>b.data.localeCompare(a.data));
     if(catModal.includes("::")){
       const [cat,sub]=catModal.split("::");
-      return transMesTodos.filter(t=>t.cat===cat&&(t.sub===sub||(t.splits&&t.splits.some(s=>s.cat===cat&&s.sub===sub))));
+      return transMesTodos.filter(t=>t.cat===cat&&(t.sub===sub||(t.splits&&t.splits.some(s=>s.cat===cat&&s.sub===sub)))).sort((a,b)=>b.data.localeCompare(a.data));
     }
-    if(catModal==="Receita") return transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t)&&!isCO(t));
-    return transMesTodos.filter(t=>t.cat===catModal);
+    if(catModal==="Receita") return transMesTodos.filter(t=>t.tipo==="c"&&!isInt(t)&&!isCO(t)).sort((a,b)=>b.data.localeCompare(a.data));
+    return transMesTodos.filter(t=>t.cat===catModal).sort((a,b)=>b.data.localeCompare(a.data));
   })():[];
   const catModalLabel=catModal==="__SEM_CATEGORIA__"?"Sem categoria / subcategoria":catModal?.includes("::")?catModal.split("::")[1]:catModal;
   const catModalCat=catModal?.includes("::")?catModal.split("::")[0]:catModal;
@@ -1412,7 +1413,9 @@ export default function App(){
     const empMesKey = `${fAno}-${String(fMes+1).padStart(2,"0")}`;
     const diasBase = EMP_DIAS_UTEIS_BASE[empMesKey] || 20;
     const diasReais = empData.diasTrabalhados?.[empMesKey] ?? diasBase;
-    const receitaBruta = diasReais * EMP_TAXA_DIARIA;
+    const receitaCalculada = diasReais * EMP_TAXA_DIARIA;
+    // Valor ajustado manualmente (override) ou calculado
+    const receitaBruta = empData.receitaReal?.[empMesKey] ?? receitaCalculada;
     const ivaRecebido = receitaBruta * 0.23;
     const isSubsidio = EMP_MESES_SUBSIDIO.includes(fMes);
 
@@ -1528,9 +1531,18 @@ export default function App(){
 
               {/* Receita s/IVA · IVA · c/IVA */}
               <div style={{background:th.bgCard,border:"1px solid rgba(34,197,94,0.3)",borderRadius:14,padding:"14px",marginBottom:10}}>
-                <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
-                  💰 Receita {MESES[fMes]} — {diasReais} dias × {fE(EMP_TAXA_DIARIA)}
-                </p>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <p style={{fontSize:10,color:th.textLow,textTransform:"uppercase",letterSpacing:1}}>
+                    💰 Receita {MESES[fMes]} (ref. dias {MESES[fMes===0?11:fMes-1]}) — {diasReais} dias × {fE(EMP_TAXA_DIARIA)}
+                  </p>
+                  {empData.receitaReal?.[empMesKey]!=null&&(
+                    <span style={{fontSize:9,color:"#f59e0b",background:"rgba(245,158,11,0.1)",borderRadius:6,padding:"2px 8px"}}>
+                      ✏ ajustado · calc: {fE(receitaCalculada)}
+                      <button onClick={()=>setEmpData(p=>{const r={...p.receitaReal};delete r[empMesKey];return{...p,receitaReal:r};})}
+                        style={{background:"none",border:"none",color:"#f59e0b",cursor:"pointer",marginLeft:4,fontSize:9}}>↺ repor</button>
+                    </span>
+                  )}
+                </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   <div style={{background:"rgba(34,197,94,0.08)",borderRadius:10,padding:"10px 12px"}}>
                     <p style={{fontSize:10,color:th.textLow,marginBottom:4}}>s/ IVA</p>
@@ -1544,7 +1556,7 @@ export default function App(){
                   <div style={{background:"rgba(59,130,246,0.08)",borderRadius:10,padding:"10px 12px"}}>
                     <p style={{fontSize:10,color:th.textLow,marginBottom:4}}>c/ IVA</p>
                     <p style={{fontSize:18,fontWeight:700,color:"#3b82f6"}}>{fE(receitaBruta+ivaRecebido)}</p>
-                    <p style={{fontSize:9,color:th.textLow,marginTop:2}}>recebido a dia 17</p>
+                    <p style={{fontSize:9,color:th.textLow,marginTop:2}}>ref. {MESES[fMes===0?11:fMes-1]} · recebido a dia 17</p>
                   </div>
                 </div>
               </div>
@@ -1575,13 +1587,15 @@ export default function App(){
                     </div>
                     <div style={{flex:1}}>
                       <p style={{fontSize:11,color:th.textLow,marginBottom:4}}>Dias reais</p>
-                      <input type="number" value={diasReais} min={0} max={31}
-                        onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[empMesKey]:parseInt(e.target.value)||0}}))}
-                        style={{fontSize:20,fontWeight:700,color:"#22c55e",background:"none",border:"none",borderBottom:"2px solid #22c55e",borderRadius:0,padding:"2px 4px",width:60,textAlign:"center"}}/>
+                      <input type="number" value={diasReais} min={0} max={31} step={0.5}
+                        onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[empMesKey]:parseFloat(e.target.value)||0}}))}
+                        style={{fontSize:20,fontWeight:700,color:"#22c55e",background:"none",border:"none",borderBottom:"2px solid #22c55e",borderRadius:0,padding:"2px 4px",width:70,textAlign:"center"}}/>
                     </div>
                     <div style={{flex:1}}>
                       <p style={{fontSize:11,color:th.textLow,marginBottom:4}}>Receita s/IVA</p>
-                      <p style={{fontSize:16,fontWeight:600,color:"#22c55e"}}>{fE(receitaBruta)}</p>
+                      <input type="number" value={empData.receitaReal?.[empMesKey]??receitaCalculada} step="0.01"
+                        onChange={e=>setEmpData(p=>({...p,receitaReal:{...(p.receitaReal||{}),[empMesKey]:parseFloat(e.target.value)||0}}))}
+                        style={{fontSize:15,fontWeight:700,color:"#22c55e",background:"none",border:"none",borderBottom:"2px solid #22c55e",borderRadius:0,padding:"2px 4px",width:"100%"}}/>
                     </div>
                   </div>
                   <PBar val={diasReais} max={diasBase} color="#22c55e"/>
@@ -2724,20 +2738,30 @@ export default function App(){
                     return{mes:s.mes,val:v||null};
                   }).filter(d=>d.val!==null);
                   const startVal=realHistory.length?realHistory[realHistory.length-1].val:0;
-                  const monthly=item.id==="xtb"?100:0;
+                  const monthly=invMensais[item.id]||0;
                   return(
                     <Card>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
                         <p style={{fontSize:13,fontWeight:600,color:th.text}}>{item.icon} {item.label} — Projecção</p>
-                        <select value={invSelected} onChange={e=>setInvSelected(e.target.value)} style={{fontSize:11,padding:"4px 8px"}}>
-                          {invItems.map(a=>(
-                            <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
-                          ))}
-                        </select>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.04)`,borderRadius:8,padding:"4px 10px",border:`1px solid ${th.border}`}}>
+                            <span style={{fontSize:10,color:th.textLow}}>Reforço/mês:</span>
+                            <input type="number" value={invMensais[item.id]||0} min={0} step={5}
+                              onChange={e=>setInvMensais(prev=>({...prev,[item.id]:parseFloat(e.target.value)||0}))}
+                              style={{width:60,fontSize:12,fontWeight:600,color:"#22c55e",background:"none",border:"none",padding:"0",textAlign:"right"}}/>
+                            <span style={{fontSize:10,color:th.textLow}}>€</span>
+                          </div>
+                          <select value={invSelected} onChange={e=>setInvSelected(e.target.value)} style={{fontSize:11,padding:"4px 8px"}}>
+                            {invItems.map(a=>(
+                              <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <p style={{fontSize:10,color:th.textLow,marginBottom:10}}>
                         Ponto de partida: <span style={{fontWeight:600,color:item.color||"#a855f7"}}>{fmtV(startVal)}</span>
-                        <span style={{color:th.textLow2}}> · clica nos pontos para tooltip · clica no eixo X para ver valores por cenário</span>
+                        {(invMensais[item.id]||0)>0&&<span style={{color:"#22c55e"}}> · +{fmtV(invMensais[item.id])}/mês</span>}
+                        <span style={{color:th.textLow2}}> · clica nos pontos para tooltip · clica no eixo X para ver valores</span>
                       </p>
                       <InvChart label={item.label} icon={item.icon} startVal={startVal} monthly={monthly}
                         realHistory={realHistory} color={item.color||"#a855f7"} chartId={item.id}/>
@@ -3589,8 +3613,8 @@ export default function App(){
                                     {t.ent&&t.ent!==t.desc&&<p style={{fontSize:10,color:th.textLow2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{t.desc}</p>}
                                   </div>
                                   <div style={{textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
-                                    <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}} style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"2px 6px",fontSize:10,cursor:"pointer"}}>✂</button>
                                     <p style={{fontSize:13,fontWeight:600,color:t.tipo==="c"?"#22c55e":isInt(t)?th.textLow:th.text,whiteSpace:"nowrap"}}>{t.tipo==="c"?"+":"-"}{fE(t.val)}</p>
+                                    <button onClick={e=>{e.stopPropagation();setSplitModal(t.id);setSplitParts(t.splits||[{id:crypto.randomUUID(),val:t.val,cat:t.cat,sub:t.sub,nota:""}]);}} style={{background:"rgba(168,85,247,0.1)",color:"#a855f7",border:"none",borderRadius:6,padding:"2px 6px",fontSize:10,cursor:"pointer"}}>✂</button>
                                   </div>
                                 </div>
                               </div>
@@ -3858,14 +3882,36 @@ export default function App(){
                 <Card key={cat} style={{marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                     <span style={{fontSize:20}}>{cfg.icon}</span>
-                    <span style={{fontSize:14,fontWeight:600,color:cfg.color,flex:1}}>{cat}</span>
-                    <div style={{width:16,height:16,borderRadius:4,background:cfg.color}}/>
+                    {/* Nome editável inline */}
+                    <input defaultValue={cat} onBlur={e=>{
+                      const newName=e.target.value.trim();
+                      if(newName&&newName!==cat){
+                        const c={...cats};
+                        c[newName]={...c[cat]};
+                        delete c[cat];
+                        setCats(c);
+                        // Migrar trans com cat antiga
+                        setTrans(prev=>prev.map(t=>t.cat===cat?{...t,cat:newName}:t));
+                        setOrcs(prev=>{const n={};Object.entries(prev).forEach(([mk,mo])=>{n[mk]={};Object.entries(mo).forEach(([k,v])=>{n[mk][k.startsWith(cat+"::")?newName+"::"+k.slice(cat.length+2):k===cat?newName:k]=v;});});return n;});
+                      }
+                    }} style={{fontSize:14,fontWeight:600,color:cfg.color,flex:1,background:"none",border:"none",borderBottom:`1px dashed ${th.border}`,padding:"2px 4px",outline:"none"}}/>
+                    {/* Cor editável */}
+                    <input type="color" value={cfg.color}
+                      onChange={e=>setCats(prev=>({...prev,[cat]:{...prev[cat],color:e.target.value}}))}
+                      style={{width:24,height:24,border:"none",borderRadius:4,cursor:"pointer",padding:0,background:"none"}}/>
                     <button onClick={()=>{if(confirm(`Apagar categoria "${cat}"?`)){const c={...cats};delete c[cat];setCats(c);}}} style={{background:"none",border:"none",color:th.textLow,fontSize:16,cursor:"pointer",padding:"0 4px"}}>×</button>
                   </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {(cfg.subs||[]).map(s=>(
                       <div key={s} style={{display:"flex",alignItems:"center",gap:4,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:20,padding:"3px 10px"}}>
-                        <span style={{fontSize:11,color:th.textMid}}>{s}</span>
+                        {/* Subcategoria editável inline */}
+                        <input defaultValue={s} onBlur={e=>{
+                          const newSub=e.target.value.trim();
+                          if(newSub&&newSub!==s){
+                            setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.map(x=>x===s?newSub:x)}}));
+                            setTrans(prev=>prev.map(t=>t.cat===cat&&t.sub===s?{...t,sub:newSub}:t));
+                          }
+                        }} style={{fontSize:11,color:th.textMid,background:"none",border:"none",width:`${Math.max(s.length,4)}ch`,outline:"none",cursor:"text"}}/>
                         <button onClick={()=>setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.filter(x=>x!==s)}}))} style={{background:"none",border:"none",color:th.textLow,fontSize:12,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
                       </div>
                     ))}
