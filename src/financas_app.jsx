@@ -621,7 +621,7 @@ function FireSimCard({autoCapital, autoMensal, th, darkMode, fE, fmtV}) {
             <span style={{fontSize:10,color:th.textLow,flexShrink:0}}>após</span>
             <input type="number" value={fase2Ano} step="0.5" min="0" max="40"
               onChange={e=>setFase2Ano(parseFloat(e.target.value)||0)}
-              style={{fontSize:13,width:60}}/>
+              style={{fontSize:13,width:85}}/>
             <span style={{fontSize:10,color:th.textLow,flexShrink:0}}>anos</span>
           </div>
           <p style={{fontSize:9,color:th.textLow,marginTop:2}}>Ex: 1.200€/mês após atingir Nível 4 (~{new Date().getFullYear()+Math.round(fase2Ano)})</p>
@@ -1453,7 +1453,8 @@ export default function App(){
     const anoOverview = Array.from({length:12},(_,m)=>{
       const mk = `${fAno}-${String(m+1).padStart(2,"0")}`;
       const dias = empData.diasTrabalhados?.[mk] ?? EMP_DIAS_UTEIS_BASE[mk] ?? 20;
-      const rec = dias * EMP_TAXA_DIARIA;
+      const recCalc = dias * EMP_TAXA_DIARIA;
+      const rec = empData.receitaReal?.[mk] ?? recCalc;
       let desp = EMP_DESPESAS_FIXAS.reduce((a,d)=>{
         return a + (empData.despesasReais?.[mk]?.[d.id] ?? d.valor);
       },0);
@@ -1936,11 +1937,15 @@ export default function App(){
                             {MESES[m.mes]}{EMP_MESES_SUBSIDIO.includes(m.mes)&&<span style={{fontSize:9,color:"#f59e0b",marginLeft:4}}>+sub</span>}
                           </td>
                           <td style={{padding:"4px 6px"}}>
-                            <input type="number" value={empData.diasTrabalhados?.[m.mk]??EMP_DIAS_UTEIS_BASE[m.mk]??20} min={0} max={31}
-                              onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[m.mk]:parseInt(e.target.value)||0}}))}
-                              style={{width:38,fontSize:11,padding:"2px 4px",textAlign:"center"}}/>
+                            <input type="number" value={empData.diasTrabalhados?.[m.mk]??EMP_DIAS_UTEIS_BASE[m.mk]??20} min={0} max={31} step={0.5}
+                              onChange={e=>setEmpData(p=>({...p,diasTrabalhados:{...p.diasTrabalhados,[m.mk]:parseFloat(e.target.value)||0}}))}
+                              style={{width:54,fontSize:11,padding:"2px 4px",textAlign:"center"}}/>
                           </td>
-                          <td style={{padding:"7px 8px",textAlign:"right",color:"#22c55e"}}>{fE(m.rec)}</td>
+                          <td style={{padding:"4px 6px",textAlign:"right"}}>
+                            <input type="number" value={empData.receitaReal?.[m.mk]??Math.round((empData.diasTrabalhados?.[m.mk]??EMP_DIAS_UTEIS_BASE[m.mk]??20)*EMP_TAXA_DIARIA*100)/100} step="0.01"
+                              onChange={e=>setEmpData(p=>({...p,receitaReal:{...(p.receitaReal||{}),[m.mk]:parseFloat(e.target.value)||0}}))}
+                              style={{width:80,fontSize:11,padding:"2px 4px",textAlign:"right",color:"#22c55e",fontWeight:600}}/>
+                          </td>
                           <td style={{padding:"7px 8px",textAlign:"right",color:"#3b82f6"}}>{fE(m.rec*1.23)}</td>
                           <td style={{padding:"7px 8px",textAlign:"right",color:"#f59e0b"}}>{fE(m.iva)}</td>
                           <td style={{padding:"7px 8px",textAlign:"right",color:"#ef4444"}}>{fE(m.desp)}</td>
@@ -3878,47 +3883,66 @@ export default function App(){
             <div>
               {!isMobile&&<><p style={{fontSize:20,fontWeight:600,color:th.text,marginBottom:2}}>Categorias</p><p style={{fontSize:12,color:th.textLow,marginBottom:14}}>Gere as tuas categorias e subcategorias</p></>}
               <Btn variant="primary" full onClick={()=>setNewCatModal(true)} style={{marginBottom:12,fontSize:13}}>+ Nova categoria</Btn>
-              {Object.entries(cats).map(([cat,cfg])=>(
-                <Card key={cat} style={{marginBottom:8}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                    <span style={{fontSize:20}}>{cfg.icon}</span>
-                    {/* Nome editável inline */}
-                    <input defaultValue={cat} onBlur={e=>{
-                      const newName=e.target.value.trim();
-                      if(newName&&newName!==cat){
-                        const c={...cats};
-                        c[newName]={...c[cat]};
-                        delete c[cat];
-                        setCats(c);
-                        // Migrar trans com cat antiga
-                        setTrans(prev=>prev.map(t=>t.cat===cat?{...t,cat:newName}:t));
-                        setOrcs(prev=>{const n={};Object.entries(prev).forEach(([mk,mo])=>{n[mk]={};Object.entries(mo).forEach(([k,v])=>{n[mk][k.startsWith(cat+"::")?newName+"::"+k.slice(cat.length+2):k===cat?newName:k]=v;});});return n;});
-                      }
-                    }} style={{fontSize:14,fontWeight:600,color:cfg.color,flex:1,background:"none",border:"none",borderBottom:`1px dashed ${th.border}`,padding:"2px 4px",outline:"none"}}/>
-                    {/* Cor editável */}
-                    <input type="color" value={cfg.color}
-                      onChange={e=>setCats(prev=>({...prev,[cat]:{...prev[cat],color:e.target.value}}))}
-                      style={{width:24,height:24,border:"none",borderRadius:4,cursor:"pointer",padding:0,background:"none"}}/>
-                    <button onClick={()=>{if(confirm(`Apagar categoria "${cat}"?`)){const c={...cats};delete c[cat];setCats(c);}}} style={{background:"none",border:"none",color:th.textLow,fontSize:16,cursor:"pointer",padding:"0 4px"}}>×</button>
-                  </div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {(cfg.subs||[]).map(s=>(
-                      <div key={s} style={{display:"flex",alignItems:"center",gap:4,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:20,padding:"3px 10px"}}>
-                        {/* Subcategoria editável inline */}
-                        <input defaultValue={s} onBlur={e=>{
-                          const newSub=e.target.value.trim();
-                          if(newSub&&newSub!==s){
-                            setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.map(x=>x===s?newSub:x)}}));
-                            setTrans(prev=>prev.map(t=>t.cat===cat&&t.sub===s?{...t,sub:newSub}:t));
-                          }
-                        }} style={{fontSize:11,color:th.textMid,background:"none",border:"none",width:`${Math.max(s.length,4)}ch`,outline:"none",cursor:"text"}}/>
-                        <button onClick={()=>setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.filter(x=>x!==s)}}))} style={{background:"none",border:"none",color:th.textLow,fontSize:12,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
-                      </div>
-                    ))}
-                    <button onClick={()=>{const s=prompt("Nova subcategoria:");if(s)setCats(prev=>({...prev,[cat]:{...prev[cat],subs:[...(prev[cat].subs||[]),s]}}));}} style={{background:"rgba(59,130,246,0.1)",border:"none",color:"#3b82f6",borderRadius:20,padding:"3px 10px",fontSize:11,cursor:"pointer"}}>+ subcategoria</button>
-                  </div>
-                </Card>
-              ))}
+              {(()=>{
+                const [catEditando,setCatEditando]=React.useState(null);
+                const [catNomeEdit,setCatNomeEdit]=React.useState("");
+                return Object.entries(cats).map(([cat,cfg])=>{
+                  const emEdicao=catEditando===cat;
+                  return(
+                  <Card key={cat} style={{marginBottom:8}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                      <span style={{fontSize:20}}>{cfg.icon}</span>
+                      {emEdicao?(
+                        <input value={catNomeEdit} onChange={e=>setCatNomeEdit(e.target.value)}
+                          style={{fontSize:14,fontWeight:600,color:cfg.color,flex:1,borderBottom:`2px solid ${cfg.color}`,background:"none",border:"none",borderBottom:`2px solid ${cfg.color}`,padding:"2px 4px",outline:"none"}}
+                          autoFocus/>
+                      ):(
+                        <span style={{fontSize:14,fontWeight:600,color:cfg.color,flex:1}}>{cat}</span>
+                      )}
+                      {emEdicao?(
+                        <>
+                          <input type="color" value={cfg.color}
+                            onChange={e=>setCats(prev=>({...prev,[cat]:{...prev[cat],color:e.target.value}}))}
+                            style={{width:28,height:28,border:"none",borderRadius:6,cursor:"pointer",padding:2}}/>
+                          <button onClick={()=>{
+                            const newName=catNomeEdit.trim();
+                            if(newName&&newName!==cat){
+                              const c={...cats};c[newName]={...c[cat]};delete c[cat];setCats(c);
+                              setTrans(prev=>prev.map(t=>t.cat===cat?{...t,cat:newName}:t));
+                              setOrcs(prev=>{const n={};Object.entries(prev).forEach(([mk,mo])=>{n[mk]={};Object.entries(mo).forEach(([k,v])=>{n[mk][k.startsWith(cat+"::")?newName+"::"+k.slice(cat.length+2):k===cat?newName:k]=v;});});return n;});
+                            }
+                            setCatEditando(null);
+                          }} style={{background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"none",borderRadius:8,padding:"4px 10px",fontSize:12,cursor:"pointer",fontWeight:600}}>✓</button>
+                        </>
+                      ):(
+                        <button onClick={()=>{setCatEditando(cat);setCatNomeEdit(cat);}}
+                          style={{background:"none",border:"none",color:th.textLow,fontSize:14,cursor:"pointer",padding:"0 4px"}} title="Editar">✏️</button>
+                      )}
+                      <button onClick={()=>{if(confirm(`Apagar categoria "${cat}"?`)){const c={...cats};delete c[cat];setCats(c);}}} style={{background:"none",border:"none",color:th.textLow,fontSize:16,cursor:"pointer",padding:"0 4px"}}>×</button>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {(cfg.subs||[]).map(s=>(
+                        <div key={s} style={{display:"flex",alignItems:"center",gap:4,background:`rgba(${th.bg==="#f0ece4"?"0,0,0":"255,255,255"},0.05)`,borderRadius:20,padding:"3px 10px"}}>
+                          {emEdicao?(
+                            <input defaultValue={s} onBlur={e=>{
+                              const newSub=e.target.value.trim();
+                              if(newSub&&newSub!==s){
+                                setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.map(x=>x===s?newSub:x)}}));
+                                setTrans(prev=>prev.map(t=>t.cat===cat&&t.sub===s?{...t,sub:newSub}:t));
+                              }
+                            }} style={{fontSize:11,color:th.textMid,background:"none",border:"none",borderBottom:`1px dashed ${th.border}`,width:`${Math.max(s.length,4)+1}ch`,outline:"none"}}/>
+                          ):(
+                            <span style={{fontSize:11,color:th.textMid}}>{s}</span>
+                          )}
+                          <button onClick={()=>setCats(prev=>({...prev,[cat]:{...prev[cat],subs:prev[cat].subs.filter(x=>x!==s)}}))} style={{background:"none",border:"none",color:th.textLow,fontSize:12,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
+                        </div>
+                      ))}
+                      {emEdicao&&<button onClick={()=>{const s=prompt("Nova subcategoria:");if(s)setCats(prev=>({...prev,[cat]:{...prev[cat],subs:[...(prev[cat].subs||[]),s]}}));}} style={{background:"rgba(59,130,246,0.1)",border:"none",color:"#3b82f6",borderRadius:20,padding:"3px 10px",fontSize:11,cursor:"pointer"}}>+ subcategoria</button>}
+                    </div>
+                  </Card>
+                  );
+                });
+              })()}
             </div>
           )}
 
