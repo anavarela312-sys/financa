@@ -337,6 +337,7 @@ const EMP_DESPESAS_FIXAS = [
   { id:"zoom",       label:"Zoom",                        valor:15.99,  icon:"💻",  cat:"fixo" },
   { id:"claude",     label:"Claude AI",                   valor:18.00,  icon:"🤖",  cat:"fixo" },
   { id:"irs_ret",    label:"Retenção IRS",                valor:14.00,  icon:"🏦",  cat:"fiscal" },
+  { id:"metlife",    label:"Seguros Metlife",              valor:81.16,  icon:"🛡️",  cat:"fixo", nota:"11,02+16,59+17,62+13,13+22,80" },
 ];
 
 const EMP_DESPESAS_PONTUAIS = [
@@ -906,6 +907,9 @@ export default function App(){
   const [snapConta,setSnapConta]=useState("");
   const [snapData,setSnapData]=useState(new Date().toISOString().slice(0,10));
   const [snapVal,setSnapVal]=useState("");
+  const [snapFonte,setSnapFonte]=useState("apparte"); // "apparte" | "ca"
+  const [snapApparte,setSnapApparte]=useState("");
+  const [snapCA,setSnapCA]=useState("");
   const [patEdit,setPatEdit]=useState(null); // month being edited e.g. "2026-04"
   const [patDraft,setPatDraft]=useState({ativos:{},passivos:{},empresa:{}});
 
@@ -2084,28 +2088,56 @@ export default function App(){
           <Card>
             <p style={{fontSize:14,fontWeight:600,color:th.text,marginBottom:4}}>Histórico — Nível 1</p>
             <p style={{fontSize:11,color:th.textLow,marginBottom:12}}>Total acumulado: Apparte + Certificados de Aforro</p>
-            {snaps.map((s,i)=>{const dev=s.actual-s.planned;return(
-              <div key={i} style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 80px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:"1px solid #0d1a2e"}}>
-                <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":th.textLow,fontWeight:i===snaps.length-1?700:400}}>{s.label}</span>
-                <div>
-                  <p style={{fontSize:10,color:th.textLow,marginBottom:1}}>Plano</p>
-                  <p style={{fontSize:12,color:th.textLow}}>{fE(s.planned)}</p>
+            {snaps.map((s,i)=>{const dev=s.actual-s.planned;const hasDetail=s.apparte!=null||s.ca!=null;return(
+              <div key={i} style={{padding:"9px 0",borderBottom:`1px solid ${th.border}`}}>
+                <div style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 80px",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:12,color:i===snaps.length-1?"#f59e0b":th.textLow,fontWeight:i===snaps.length-1?700:400}}>{s.label}</span>
+                  <div>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:1}}>Plano</p>
+                    <p style={{fontSize:12,color:th.textLow}}>{fE(s.planned)}</p>
+                  </div>
+                  <div>
+                    <p style={{fontSize:10,color:th.textLow,marginBottom:1}}>Real</p>
+                    <p style={{fontSize:13,fontWeight:600,color:th.text}}>{fE(s.actual)}</p>
+                  </div>
+                  <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444",fontWeight:600,textAlign:"right"}}>{dev>=0?"+":""}{fE(dev)}</span>
                 </div>
-                <div>
-                  <p style={{fontSize:10,color:th.textLow,marginBottom:1}}>Real</p>
-                  <p style={{fontSize:13,fontWeight:600,color:th.text}}>{fE(s.actual)}</p>
-                </div>
-                <span style={{fontSize:12,color:dev>=0?"#22c55e":"#ef4444",fontWeight:600,textAlign:"right"}}>{dev>=0?"+":""}{fE(dev)}</span>
+                {hasDetail&&<div style={{display:"flex",gap:16,marginTop:4,paddingLeft:88}}>
+                  {s.apparte!=null&&<span style={{fontSize:10,color:th.textLow}}>🏺 Mealheiro: <span style={{color:"#22c55e",fontWeight:600}}>{fE(s.apparte)}</span></span>}
+                  {s.ca!=null&&<span style={{fontSize:10,color:th.textLow}}>🏦 Cert. Aforro: <span style={{color:"#3b82f6",fontWeight:600}}>{fE(s.ca)}</span></span>}
+                </div>}
               </div>
             );})}
-            <div style={{display:"flex",gap:8,marginTop:14}}>
-              <input type="number" placeholder="Total Nível 1 actual (Apparte + CA) em €" value={newSnap} onChange={e=>setNewSnap(e.target.value)} style={{flex:1}}/>
-              <Btn variant="primary" style={{fontSize:12,padding:"10px 12px",whiteSpace:"nowrap"}} onClick={()=>{
-                const v=parseFloat(newSnap);if(isNaN(v))return;
+            <div style={{marginTop:14,background:darkMode?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.02)",borderRadius:12,padding:12}}>
+              <p style={{fontSize:11,fontWeight:600,color:th.textMid,marginBottom:10}}>Registar novo mês</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                <div>
+                  <Lbl>Apparte Mealheiro (€)</Lbl>
+                  <input type="number" placeholder="Ex: 1350" value={snapApparte}
+                    onChange={e=>setSnapApparte(e.target.value)} step="0.01"/>
+                </div>
+                <div>
+                  <Lbl>Certificados de Aforro (€)</Lbl>
+                  <input type="number" placeholder="Ex: 0" value={snapCA}
+                    onChange={e=>setSnapCA(e.target.value)} step="0.01"/>
+                </div>
+              </div>
+              {(snapApparte||snapCA)&&(
+                <div style={{padding:"6px 10px",background:"rgba(34,197,94,0.08)",borderRadius:8,marginBottom:10,display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:12,color:th.textLow}}>Total calculado</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>{fE((parseFloat(snapApparte)||0)+(parseFloat(snapCA)||0))}</span>
+                </div>
+              )}
+              <Btn variant="primary" full style={{fontSize:13}} onClick={()=>{
+                const vApp=parseFloat(snapApparte)||0;
+                const vCA=parseFloat(snapCA)||0;
+                const v=vApp+vCA;
+                if(!v)return;
                 const last=snaps[snaps.length-1];let nm=last.month+1,ny=last.year;if(nm>11){nm=0;ny++;}
                 const pl=Math.min(800*Math.max(0,nm-3+(ny-2026)*12),L1_TOTAL);
-                setSnaps(prev=>[...prev,{label:`${MESES[nm]} ${ny}`,year:ny,month:nm,planned:Math.max(0,pl),actual:v,note:v>=pl?"✓ No plano":"⚠ Abaixo"}]);setNewSnap("");
-              }}>Registar</Btn>
+                setSnaps(prev=>[...prev,{label:`${MESES[nm]} ${ny}`,year:ny,month:nm,planned:Math.max(0,pl),actual:v,apparte:vApp,ca:vCA,note:v>=pl?"✓ No plano":"⚠ Abaixo"}]);
+                setSnapApparte("");setSnapCA("");
+              }}>✓ Registar {(()=>{const last=snaps[snaps.length-1];let nm=last.month+1,ny=last.year;if(nm>11){nm=0;ny++;}return `${MESES[nm]} ${ny}`;})()}</Btn>
             </div>
           </Card>
 
